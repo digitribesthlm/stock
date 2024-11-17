@@ -1,3 +1,4 @@
+// pages/dashboard/index.js
 import { useState } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 
@@ -32,26 +33,6 @@ export default function Dashboard() {
     }
   };
 
-  const formatNumber = (num) => {
-    if (num === null || num === undefined) return 'N/A';
-    if (typeof num === 'number') {
-      if (Math.abs(num) >= 1e9) {
-        return (num / 1e9).toFixed(2) + 'B';
-      } else if (Math.abs(num) >= 1e6) {
-        return (num / 1e6).toFixed(2) + 'M';
-      } else if (Math.abs(num) >= 1e3) {
-        return (num / 1e3).toFixed(2) + 'K';
-      }
-      return num.toFixed(2);
-    }
-    return num;
-  };
-
-  const formatPercentage = (num) => {
-    if (num === null || num === undefined) return 'N/A';
-    return num.toFixed(2) + '%';
-  };
-
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -84,19 +65,19 @@ export default function Dashboard() {
               <div className="space-y-6">
                 {/* Basic Info */}
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="text-lg font-semibold mb-3">{stockData.companyName} ({stockData.symbol})</h3>
+                  <h3 className="text-lg font-semibold mb-3">{stockData.companyName}</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <p className="text-gray-600">Current Price</p>
-                      <p className="text-lg font-semibold">${formatNumber(stockData.currentPrice)}</p>
+                      <p className="text-lg font-semibold">{stockData.currentPrice}</p>
                     </div>
                     <div>
                       <p className="text-gray-600">Graham Score</p>
-                      <p className="text-lg font-semibold">{formatNumber(stockData.grahamScore)}</p>
+                      <p className="text-lg font-semibold">{stockData.grahamScore}</p>
                     </div>
                     <div>
                       <p className="text-gray-600">Lynch Score</p>
-                      <p className="text-lg font-semibold">{formatNumber(stockData.lynchScore)}</p>
+                      <p className="text-lg font-semibold">{stockData.lynchScore}</p>
                     </div>
                   </div>
                 </div>
@@ -108,15 +89,15 @@ export default function Dashboard() {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-gray-600">P/E Ratio</span>
-                        <span>{formatNumber(stockData.trailingPE)}</span>
+                        <span>{stockData.valuationMetrics.peRatio}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">PEG Ratio</span>
-                        <span>{formatNumber(stockData.pegRatio)}</span>
+                        <span>{stockData.valuationMetrics.pegRatio}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Price/Book</span>
-                        <span>{formatNumber(stockData.priceToBook)}</span>
+                        <span>{stockData.valuationMetrics.priceToBook}</span>
                       </div>
                     </div>
                   </div>
@@ -126,11 +107,11 @@ export default function Dashboard() {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Revenue Growth (YoY)</span>
-                        <span>{formatPercentage(stockData.quarterlyRevenueGrowth * 100)}</span>
+                        <span>{stockData.growthMetrics.revenueGrowth}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Earnings Growth (YoY)</span>
-                        <span>{formatPercentage(stockData.quarterlyEarningsGrowth * 100)}</span>
+                        <span>{stockData.growthMetrics.earningsGrowth}</span>
                       </div>
                     </div>
                   </div>
@@ -140,88 +121,25 @@ export default function Dashboard() {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Current Ratio</span>
-                        <span>{formatNumber(stockData.currentRatio)}</span>
+                        <span>{stockData.financialHealth.currentRatio}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Debt/Equity</span>
-                        <span>{formatNumber(stockData.debtToEquity)}</span>
+                        <span>{stockData.financialHealth.debtToEquity}</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Lynch Classifications */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-medium mb-2">Lynch Classifications</h4>
-                  <p className="text-gray-800">{stockData.lynchClassifications}</p>
-                </div>
-
                 {/* Warnings */}
-                {stockData.missingDataWarnings && (
+                {stockData.warnings && (
                   <div className="bg-yellow-50 p-4 rounded-lg">
                     <h4 className="font-medium mb-2 text-yellow-800">Data Warnings</h4>
-                    <p className="text-yellow-700">{stockData.missingDataWarnings}</p>
+                    <p className="text-yellow-700">{stockData.warnings}</p>
                   </div>
                 )}
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Welcome Section */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h1 className="text-2xl font-bold mb-2">Welcome back!</h1>
-          <p className="text-gray-600">Here's an overview of your topics and recent activity.</p>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="text-gray-600 mb-1">Total Topics</div>
-            <div className="text-3xl font-bold">24</div>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="text-gray-600 mb-1">Active Topics</div>
-            <div className="text-3xl font-bold">12</div>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="text-gray-600 mb-1">Completed Topics</div>
-            <div className="text-3xl font-bold">8</div>
-          </div>
-        </div>
-
-        {/* Recent Topics */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-xl font-semibold mb-4">Recent Topics</h2>
-          <div className="space-y-4">
-            {[1, 2, 3].map((item) => (
-              <div key={item} className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-lg">
-                <div>
-                  <h3 className="font-medium">Topic Name {item}</h3>
-                  <p className="text-sm text-gray-600">Last updated 2 days ago</p>
-                </div>
-                <button className="text-blue-600 hover:text-blue-700">View Details</button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <button className="p-4 text-left hover:bg-gray-50 rounded-lg">
-              <h3 className="font-medium">Create New Topic</h3>
-              <p className="text-sm text-gray-600">Start a new topic from scratch</p>
-            </button>
-            <button className="p-4 text-left hover:bg-gray-50 rounded-lg">
-              <h3 className="font-medium">Import Topics</h3>
-              <p className="text-sm text-gray-600">Import topics from external sources</p>
-            </button>
-            <button className="p-4 text-left hover:bg-gray-50 rounded-lg">
-              <h3 className="font-medium">Generate Report</h3>
-              <p className="text-sm text-gray-600">Create a summary report</p>
-            </button>
           </div>
         </div>
       </div>
