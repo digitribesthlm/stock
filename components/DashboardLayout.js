@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import Footer from './Footer';
+import Link from 'next/link';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
@@ -48,15 +49,24 @@ export default function DashboardLayout({ children }) {
                 {process.env.NEXT_PUBLIC_BRAND_NAME}
               </div>
               <div className="hidden md:flex space-x-8">
-                <a href="/dashboard" className={`text-gray-600 hover:text-gray-900 ${router.pathname === '/dashboard' ? 'text-blue-600 font-medium' : ''}`}>
+                <Link 
+                  href="/dashboard" 
+                  className={`text-gray-600 hover:text-gray-900 ${router.pathname === '/dashboard' ? 'text-blue-600 font-medium' : ''}`}
+                >
                   Dashboard
-                </a>
-                <a href="/dashboard/topics" className={`text-gray-600 hover:text-gray-900 ${router.pathname === '/dashboard/topics' ? 'text-blue-600 font-medium' : ''}`}>
-                  Topics
-                </a>
-                <a href="/dashboard/analytics" className={`text-gray-600 hover:text-gray-900 ${router.pathname === '/dashboard/analytics' ? 'text-blue-600 font-medium' : ''}`}>
+                </Link>
+                <Link 
+                  href="/stocks" 
+                  className={`text-gray-600 hover:text-gray-900 ${router.pathname === '/stocks' ? 'text-blue-600 font-medium' : ''}`}
+                >
+                  Stocks
+                </Link>
+                <Link 
+                  href="/dashboard/analytics" 
+                  className={`text-gray-600 hover:text-gray-900 ${router.pathname === '/dashboard/analytics' ? 'text-blue-600 font-medium' : ''}`}
+                >
                   Analytics
-                </a>
+                </Link>
               </div>
             </div>
 
@@ -78,12 +88,18 @@ export default function DashboardLayout({ children }) {
                 </button>
                 {isMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2">
-                    <a href="/dashboard/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-100">
+                    <Link 
+                      href="/dashboard/profile" 
+                      className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
+                    >
                       Profile
-                    </a>
-                    <a href="/dashboard/settings" className="block px-4 py-2 text-gray-700 hover:bg-gray-100">
+                    </Link>
+                    <Link 
+                      href="/dashboard/settings" 
+                      className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
+                    >
                       Settings
-                    </a>
+                    </Link>
                     <hr className="my-2" />
                     <button 
                       onClick={handleLogout}
@@ -108,4 +124,4 @@ export default function DashboardLayout({ children }) {
       <Footer />
     </div>
   );
-} 
+}
