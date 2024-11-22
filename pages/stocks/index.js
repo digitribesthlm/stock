@@ -6,11 +6,14 @@ export default function StocksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [displayMode, setDisplayMode] = useState('grid');
-  
-  // Sorting state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 9; // For grid view, 9 items per page
+  const tableItemsPerPage = 10; // For table view, 10 items per page
+
+  // Initialize sort config to Lynch Score descending
   const [sortConfig, setSortConfig] = useState({
-    key: null,
-    direction: 'ascending'
+    key: 'lynchScore',
+    direction: 'descending'
   });
 
   useEffect(() => {
@@ -40,6 +43,8 @@ export default function StocksPage() {
 
   // Helper function to safely get nested number values
   const getNumberValue = (obj, path, defaultValue = 0) => {
+    if (!obj) return defaultValue;
+    
     const value = path.split('.').reduce((acc, part) => acc && acc[part], obj);
     
     if (value && typeof value === 'object' && '$numberDouble' in value) {
@@ -53,179 +58,9 @@ export default function StocksPage() {
     return defaultValue;
   };
 
-  // Sorting function remains the same as in previous implementation
-
-  // Render Grid View
-  const renderGridView = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {sortedStocks.map((stock) => (
-        <div key={stock._id.$oid} className="bg-white rounded-lg shadow-lg p-6 space-y-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-2xl font-bold text-blue-600">{stock.ticker}</h2>
-              <h3 className="text-sm text-gray-500">{stock.company}</h3>
-            </div>
-            <div className="flex flex-col items-end">
-              <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs mb-2">
-                {stock.metadata?.status || 'Unknown'}
-              </span>
-              <span className="text-xs text-gray-500">
-                Updated: {new Date(stock.metadata?.lastUpdated?.$date?.$numberLong * 1).toLocaleDateString()}
-              </span>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-200 pt-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Lynch Score</div>
-                <div className="font-semibold text-blue-600 text-lg">
-                  {getNumberValue(stock.analysis, 'lynchScore').toFixed(2)}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 mb-1">PEG Ratio</div>
-                <div className="font-semibold text-sm">
-                  {getNumberValue(stock.metrics, 'pegRatio').toFixed(2)}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-200 pt-4">
-            <div className="text-xs text-gray-500 mb-2">Analysis Reasons</div>
-            <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-              {stock.analysis?.reasons?.map((reason, index) => (
-                <li key={index}>{reason}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="border-t border-gray-200 pt-4">
-            <div className="text-xs text-gray-500 mb-2">Classifications</div>
-            <div className="space-y-2">
-              {stock.analysis?.classifications?.map((classification, index) => (
-                <div 
-                  key={index} 
-                  className="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-sm"
-                >
-                  <div className="font-semibold">{classification.type}</div>
-                  <div className="text-xs text-blue-600">{classification.details}</div>
-                  {classification.metrics && (
-                    <div className="mt-1 text-xs">
-                      {Object.entries(classification.metrics).map(([key, value]) => (
-                        <div key={key}>
-                          {key}: {getNumberValue(classification.metrics, key).toFixed(2)}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="border-t border-gray-200 pt-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Institutional Ownership</div>
-                <div className="font-semibold text-sm">
-                  {(getNumberValue(stock.metrics, 'institutionalOwnership') * 100).toFixed(1)}%
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Insider Holdings</div>
-                <div className="font-semibold text-sm">
-                  {(getNumberValue(stock.metrics, 'insiderHoldings') * 100).toFixed(1)}%
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Earnings Growth</div>
-                <div className="font-semibold text-sm">
-                  {(getNumberValue(stock.metrics, 'earningsGrowth') * 100).toFixed(1)}%
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Profit Margins</div>
-                <div className="font-semibold text-sm">
-                  {(getNumberValue(stock.metrics, 'profitMargins') * 100).toFixed(1)}%
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
-  // Rest of the component remains the same as in the previous implementation
-  // (renderTableView, renderContent, and return statement)
-  // ... [previous implementation of these methods]
-
-  // Keeping the existing renderTableView, renderContent, and return methods from the previous implementation
-  const renderTableView = () => (
-    <div className="bg-white shadow-md rounded-lg overflow-hidden">
-      <table className="w-full">
-        <thead className="bg-gray-100 border-b">
-          <tr>
-            {[
-              { key: 'ticker', label: 'Ticker' },
-              { key: 'lynchScore', label: 'Lynch Score' },
-              { key: 'pegRatio', label: 'PEG Ratio' },
-              { key: 'institutionalOwnership', label: 'Institutional Ownership' },
-              { key: 'insiderHoldings', label: 'Insider Holdings' },
-              { key: 'earningsGrowth', label: 'Earnings Growth' },
-              { key: 'profitMargins', label: 'Profit Margins' }
-            ].map(({ key, label }) => (
-              <th 
-                key={key}
-                onClick={() => handleSort(key)}
-                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200"
-              >
-                <div className="flex items-center">
-                  {label}
-                  {sortConfig.key === key && (
-                    <span className="ml-2">
-                      {sortConfig.direction === 'ascending' ? '▲' : '▼'}
-                    </span>
-                  )}
-                </div>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200">
-          {sortedStocks.map((stock) => (
-            <tr key={stock._id.$oid} className="hover:bg-gray-50">
-              <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{stock.ticker}</td>
-              <td className="px-4 py-4 whitespace-nowrap text-sm text-blue-600">
-                {getNumberValue(stock.analysis, 'lynchScore').toFixed(2)}
-              </td>
-              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                {getNumberValue(stock.metrics, 'pegRatio').toFixed(2)}
-              </td>
-              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                {(getNumberValue(stock.metrics, 'institutionalOwnership') * 100).toFixed(1)}%
-              </td>
-              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                {(getNumberValue(stock.metrics, 'insiderHoldings') * 100).toFixed(1)}%
-              </td>
-              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                {(getNumberValue(stock.metrics, 'earningsGrowth') * 100).toFixed(1)}%
-              </td>
-              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                {(getNumberValue(stock.metrics, 'profitMargins') * 100).toFixed(1)}%
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-
   // Sorting function
   const sortedStocks = useMemo(() => {
-    if (!sortConfig.key) return stocks;
+    if (!stocks.length) return stocks;
 
     return [...stocks].sort((a, b) => {
       let aValue, bValue;
@@ -235,6 +70,10 @@ export default function StocksPage() {
           aValue = a.ticker;
           bValue = b.ticker;
           break;
+        case 'company':
+          aValue = a.company;
+          bValue = b.company;
+          break;
         case 'lynchScore':
           aValue = getNumberValue(a.analysis, 'lynchScore');
           bValue = getNumberValue(b.analysis, 'lynchScore');
@@ -243,14 +82,6 @@ export default function StocksPage() {
           aValue = getNumberValue(a.metrics, 'pegRatio');
           bValue = getNumberValue(b.metrics, 'pegRatio');
           break;
-        case 'institutionalOwnership':
-          aValue = getNumberValue(a.metrics, 'institutionalOwnership');
-          bValue = getNumberValue(b.metrics, 'institutionalOwnership');
-          break;
-        case 'insiderHoldings':
-          aValue = getNumberValue(a.metrics, 'insiderHoldings');
-          bValue = getNumberValue(b.metrics, 'insiderHoldings');
-          break;
         case 'earningsGrowth':
           aValue = getNumberValue(a.metrics, 'earningsGrowth');
           bValue = getNumberValue(b.metrics, 'earningsGrowth');
@@ -258,6 +89,10 @@ export default function StocksPage() {
         case 'profitMargins':
           aValue = getNumberValue(a.metrics, 'profitMargins');
           bValue = getNumberValue(b.metrics, 'profitMargins');
+          break;
+        case 'status':
+          aValue = a.metadata?.status || 'Unknown';
+          bValue = b.metadata?.status || 'Unknown';
           break;
         default:
           return 0;
@@ -273,25 +108,269 @@ export default function StocksPage() {
     });
   }, [stocks, sortConfig]);
 
+  // Pagination
+  const paginatedStocks = useMemo(() => {
+    const pageSize = displayMode === 'grid' ? itemsPerPage : tableItemsPerPage;
+    const startIndex = (currentPage - 1) * pageSize;
+    return sortedStocks.slice(startIndex, startIndex + pageSize);
+  }, [sortedStocks, currentPage, displayMode]);
+
+  // Total pages calculation
+  const totalPages = useMemo(() => {
+    const pageSize = displayMode === 'grid' ? itemsPerPage : tableItemsPerPage;
+    return Math.ceil(sortedStocks.length / pageSize);
+  }, [sortedStocks, displayMode]);
+
   // Sorting handler
   const handleSort = (key) => {
-    setSortConfig(prevConfig => {
-      // If sorting by the same column, toggle direction
-      if (prevConfig.key === key) {
-        return {
-          key,
-          direction: prevConfig.direction === 'ascending' ? 'descending' : 'ascending'
-        };
-      }
-      // If sorting by a new column, default to ascending
-      return {
-        key,
-        direction: 'ascending'
-      };
-    });
+    setSortConfig(prevConfig => ({
+      key,
+      direction: prevConfig.key === key && prevConfig.direction === 'ascending' 
+        ? 'descending' 
+        : 'ascending'
+    }));
+    setCurrentPage(1);
   };
 
-  // Render Content method remains the same
+  // Pagination handlers
+  const goToNextPage = () => {
+    setCurrentPage(Math.min(currentPage + 1, totalPages));
+  };
+
+  const goToPreviousPage = () => {
+    setCurrentPage(Math.max(currentPage - 1, 1));
+  };
+
+  // Render Grid View
+  const renderGridView = () => (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {paginatedStocks.map((stock) => (
+          <div key={stock._id?.$oid} className="bg-white rounded-lg shadow-lg p-6 space-y-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-2xl font-bold text-blue-600">{stock.ticker}</h2>
+                <h3 className="text-sm text-gray-500">{stock.company}</h3>
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs mb-2">
+                  {stock.metadata?.status || 'Unknown'}
+                </span>
+                <span className="text-xs text-gray-500">
+                  Updated: {new Date(Number(stock.metadata?.lastUpdated?.$date?.$numberLong)).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Lynch Score</div>
+                  <div className="font-semibold text-blue-600 text-lg">
+                    {getNumberValue(stock.analysis, 'lynchScore').toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">PEG Ratio</div>
+                  <div className="font-semibold text-sm">
+                    {getNumberValue(stock.metrics, 'pegRatio').toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 pt-4">
+              <div className="text-xs text-gray-500 mb-2">Analysis Reasons</div>
+              <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+                {stock.analysis?.reasons?.map((reason, index) => (
+                  <li key={index}>{reason}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="border-t border-gray-200 pt-4">
+              <div className="text-xs text-gray-500 mb-2">Classifications</div>
+              <div className="space-y-2">
+                {stock.analysis?.classifications?.map((classification, index) => (
+                  <div 
+                    key={index} 
+                    className="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-sm"
+                  >
+                    <div className="font-semibold">{classification.type}</div>
+                    <div className="text-xs text-blue-600">{classification.details}</div>
+                    {classification.metrics && (
+                      <div className="mt-1 text-xs">
+                        {Object.entries(classification.metrics).map(([key, value]) => (
+                          <div key={key}>
+                            {key}: {getNumberValue(classification.metrics, key).toFixed(2)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {classification.industry && (
+                      <div className="text-xs mt-1">Industry: {classification.industry}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Institutional Ownership</div>
+                  <div className="font-semibold text-sm">
+                    {(getNumberValue(stock.metrics, 'institutionalOwnership') * 100).toFixed(1)}%
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Insider Holdings</div>
+                  <div className="font-semibold text-sm">
+                    {(getNumberValue(stock.metrics, 'insiderHoldings') * 100).toFixed(1)}%
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Earnings Growth</div>
+                  <div className="font-semibold text-sm">
+                    {(getNumberValue(stock.metrics, 'earningsGrowth') * 100).toFixed(1)}%
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Profit Margins</div>
+                  <div className="font-semibold text-sm">
+                    {(getNumberValue(stock.metrics, 'profitMargins') * 100).toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {/* Pagination Controls */}
+      <div className="flex justify-center items-center mt-8 space-x-4">
+        <button 
+          onClick={goToPreviousPage} 
+          disabled={currentPage === 1}
+          className={`px-4 py-2 rounded-md ${
+            currentPage === 1 
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          Previous
+        </button>
+        <span className="text-gray-600">
+          Page {currentPage} of {totalPages}
+        </span>
+        <button 
+          onClick={goToNextPage} 
+          disabled={currentPage === totalPages}
+          className={`px-4 py-2 rounded-md ${
+            currentPage === totalPages 
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          Next
+        </button>
+      </div>
+    </>
+  );
+
+  // Render Table View
+  const renderTableView = () => (
+    <>
+      <div className="bg-white shadow-md rounded-lg overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-100 border-b">
+            <tr>
+              {[
+                { key: 'ticker', label: 'Ticker' },
+                { key: 'company', label: 'Company' },
+                { key: 'lynchScore', label: 'Lynch Score' },
+                { key: 'pegRatio', label: 'PEG Ratio' },
+                { key: 'earningsGrowth', label: 'Earnings Growth' },
+                { key: 'profitMargins', label: 'Profit Margins' },
+                { key: 'status', label: 'Status' }
+              ].map(({ key, label }) => (
+                <th 
+                  key={key}
+                  onClick={() => handleSort(key)}
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200"
+                >
+                  <div className="flex items-center">
+                    {label}
+                    {sortConfig.key === key && (
+                      <span className="ml-2">
+                        {sortConfig.direction === 'ascending' ? '▲' : '▼'}
+                      </span>
+                    )}
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {paginatedStocks.map((stock) => (
+              <tr key={stock._id?.$oid} className="hover:bg-gray-50">
+                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{stock.ticker}</td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{stock.company}</td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
+                  {getNumberValue(stock.analysis, 'lynchScore').toFixed(2)}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {getNumberValue(stock.metrics, 'pegRatio').toFixed(2)}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {(getNumberValue(stock.metrics, 'earningsGrowth') * 100).toFixed(1)}%
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {(getNumberValue(stock.metrics, 'profitMargins') * 100).toFixed(1)}%
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap">
+                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                    {stock.metadata?.status || 'Unknown'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      
+      {/* Pagination Controls */}
+      <div className="flex justify-center items-center mt-8 space-x-4">
+        <button 
+          onClick={goToPreviousPage} 
+          disabled={currentPage === 1}
+          className={`px-4 py-2 rounded-md ${
+            currentPage === 1 
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          Previous
+        </button>
+        <span className="text-gray-600">
+          Page {currentPage} of {totalPages}
+        </span>
+        <button 
+          onClick={goToNextPage} 
+          disabled={currentPage === totalPages}
+          className={`px-4 py-2 rounded-md ${
+            currentPage === totalPages 
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          Next
+        </button>
+      </div>
+    </>
+  );
+
+  // Render Content method
   const renderContent = () => {
     if (loading) {
       return (
@@ -308,9 +387,6 @@ export default function StocksPage() {
       return (
         <div className="flex justify-center items-center min-h-[400px]">
           <div className="text-center bg-red-50 p-8 rounded-lg max-w-md">
-            <svg className="w-12 h-12 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
             <h3 className="text-lg font-semibold text-red-800 mb-2">Error Loading Data</h3>
             <p className="text-red-600">{error}</p>
           </div>
@@ -322,9 +398,6 @@ export default function StocksPage() {
       return (
         <div className="flex justify-center items-center min-h-[400px]">
           <div className="text-center bg-gray-50 p-8 rounded-lg max-w-md">
-            <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-            </svg>
             <h3 className="text-lg font-semibold text-gray-800 mb-2">No Stocks Found</h3>
             <p className="text-gray-600">There are currently no stocks in the database.</p>
           </div>
@@ -340,11 +413,14 @@ export default function StocksPage() {
       <div className="mb-8 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Stock Analysis</h1>
-          <p className="mt-2 text-gray-600">View and analyze stock performance metrics</p>
+          <p className="mt-2 text-gray-600">Sorted by Lynch Score (Highest First)</p>
         </div>
         <div className="flex space-x-2">
           <button 
-            onClick={() => setDisplayMode('grid')}
+            onClick={() => {
+              setDisplayMode('grid');
+              setCurrentPage(1);
+            }}
             className={`px-4 py-2 rounded-md ${
               displayMode === 'grid' 
                 ? 'bg-blue-600 text-white' 
@@ -354,7 +430,10 @@ export default function StocksPage() {
             Grid View
           </button>
           <button 
-            onClick={() => setDisplayMode('table')}
+            onClick={() => {
+              setDisplayMode('table');
+              setCurrentPage(1);
+            }}
             className={`px-4 py-2 rounded-md ${
               displayMode === 'table' 
                 ? 'bg-blue-600 text-white' 
