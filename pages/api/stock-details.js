@@ -1,48 +1,84 @@
 import { connectToDatabase } from '../../utils/mongodb';
 
 export default async function handler(req, res) {
-  console.log('Stock Details API Endpoint Called'); // Logging start of request
+  // Set CORS headers to prevent any potential CORS issues
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  console.log('Stock Details API Endpoint Called');
 
   if (req.method !== 'GET') {
-    console.log('Method not allowed'); // Log method check
+    console.log('Method not allowed');
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
   try {
-    console.log('Attempting to connect to database'); // Log database connection attempt
+    console.log('Attempting to connect to database');
     const { db, client } = await connectToDatabase();
-    console.log('Database connection successful'); // Log successful connection
-
-    console.log('Attempting to access stock collection'); // Log collection access attempt
-    const stocksCollection = db.collection('stock');
-    console.log('Stock collection accessed successfully'); // Log successful collection access
-
-    console.log('Attempting to find stocks'); // Log find operation start
-    const stocks = await stocksCollection.find({}).toArray();
-    console.log('Find operation completed', stocks.length); // Log number of stocks found
-
-    if (!stocks || stocks.length === 0) {
-      console.log('No stocks found'); // Log empty result
-      return res.status(404).json({ message: 'No stock data found' });
+    
+    if (!db) {
+      console.error('Database connection failed - db object is undefined');
+      throw new Error('Database connection failed');
     }
     
-    // Log first stock as a sample
-    console.log('First stock sample:', stocks[0]);
+    console.log('Database connection successful');
+
+    console.log('Attempting to access stock collection');
+    const stocksCollection = db.collection('stock');
     
-    res.status(200).json(stocks);
+    if (!stocksCollection) {
+      console.error('Stock collection access failed - collection is undefined');
+      throw new Error('Failed to access stock collection');
+    }
+    
+    console.log('Stock collection accessed successfully');
+
+    console.log('Attempting to find stocks');
+    const stocks = await stocksCollection.find({}).toArray();
+    
+    if (!stocks) {
+      console.error('Find operation failed - result is undefined');
+      throw new Error('Failed to retrieve stocks from database');
+    }
+    
+    console.log(`Found ${stocks.length} stocks`);
+
+    if (stocks.length === 0) {
+      console.log('No stocks found in database');
+      return res.status(200).json([]); // Return empty array instead of 404
+    }
+
+    // Validate that we have valid JSON data
+    try {
+      JSON.stringify(stocks);
+    } catch (jsonError) {
+      console.error('JSON serialization failed:', jsonError);
+      throw new Error('Failed to serialize stock data');
+    }
+
+    // Set proper content type
+    res.setHeader('Content-Type', 'application/json');
+    
+    // Send response
+    return res.status(200).json(stocks);
+    
   } catch (error) {
-    console.error('Detailed Database Error:', {
+    console.error('Detailed Error:', {
+      name: error.name,
       message: error.message,
       stack: error.stack,
-      name: error.name
+      cause: error.cause
     });
 
-    res.status(500).json({ 
+    // Send a more detailed error response
+    return res.status(500).json({ 
       message: 'Failed to fetch stock data',
       error: process.env.NODE_ENV === 'development' ? {
+        name: error.name,
         message: error.message,
-        stack: error.stack
-      } : undefined
+        cause: error.cause
+      } : 'Internal server error'
     });
   }
 }

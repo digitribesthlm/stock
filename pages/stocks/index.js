@@ -1,5 +1,78 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
+
+// Search Bar Component
+const SearchBar = ({ searchQuery, handleSearch }) => (
+  <div className="mb-6">
+    <div className="relative">
+      <input
+        type="text"
+        placeholder="Search by ticker symbol..."
+        value={searchQuery}
+        onChange={(e) => handleSearch(e.target.value)}
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:outline-none"
+        autoComplete="off"
+        spellCheck="false"
+      />
+      {searchQuery && (
+        <button
+          onClick={() => handleSearch('')}
+          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          type="button"
+        >
+          ×
+        </button>
+      )}
+    </div>
+  </div>
+);
+
+// Filter Bar Component
+const FilterBar = ({ filterLabels, activeFilters, setActiveFilters, searchQuery, handleSearch, setCurrentPage }) => (
+  <div className="mb-6">
+    <div className="text-sm text-gray-600 mb-2">Filter by Analysis:</div>
+    <div className="flex flex-wrap gap-2">
+      {filterLabels.map((label) => (
+        <button
+          key={label}
+          onClick={() => {
+            setActiveFilters(prev => {
+              const isActive = prev.includes(label);
+              if (isActive) {
+                return prev.filter(f => f !== label);
+              } else {
+                return [...prev, label];
+              }
+            });
+            setCurrentPage(1);
+          }}
+          className={`px-3 py-1 rounded-full text-sm ${
+            activeFilters.includes(label)
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          {label}
+          {activeFilters.includes(label) && (
+            <span className="ml-2">×</span>
+          )}
+        </button>
+      ))}
+      {(activeFilters.length > 0 || searchQuery) && (
+        <button
+          onClick={() => {
+            setActiveFilters([]);
+            handleSearch('');
+            setCurrentPage(1);
+          }}
+          className="px-3 py-1 rounded-full text-sm text-red-600 hover:bg-red-50"
+        >
+          Clear All
+        </button>
+      )}
+    </div>
+  </div>
+);
 
 export default function StocksPage() {
   const [stocks, setStocks] = useState([]);
@@ -7,9 +80,16 @@ export default function StocksPage() {
   const [error, setError] = useState(null);
   const [displayMode, setDisplayMode] = useState('grid');
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeFilter, setActiveFilter] = useState(null);
+  const [activeFilters, setActiveFilters] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const itemsPerPage = 9;
   const tableItemsPerPage = 10;
+
+  // Debounced search handler
+  const handleSearch = useCallback((value) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  }, []);
 
   // Initial sort config to Lynch Score descending
   const [sortConfig, setSortConfig] = useState({
@@ -52,16 +132,24 @@ export default function StocksPage() {
     fetchStocks();
   }, []);
 
-  // Filter stocks based on active filter
+  // Filter stocks based on active filters and search query
   const filteredStocks = useMemo(() => {
-    if (!activeFilter) return stocks;
-    
-    return stocks.filter(stock => 
-      stock.analysis?.reasons?.some(reason => 
-        reason.toLowerCase().includes(activeFilter.toLowerCase())
-      )
-    );
-  }, [stocks, activeFilter]);
+    return stocks.filter(stock => {
+      // Apply ticker search filter
+      const matchesSearch = searchQuery === '' || 
+        stock.ticker.toLowerCase().includes(searchQuery.toLowerCase());
+
+      // Apply label filters
+      const matchesLabels = activeFilters.length === 0 || 
+        activeFilters.every(filter =>
+          stock.analysis?.reasons?.some(reason => 
+            reason.toLowerCase().includes(filter.toLowerCase())
+          )
+        );
+
+      return matchesSearch && matchesLabels;
+    });
+  }, [stocks, activeFilters, searchQuery]);
 
   // Helper function to safely get nested number values
   const getNumberValue = (obj, path, defaultValue = 0) => {
@@ -162,45 +250,6 @@ export default function StocksPage() {
   const goToPreviousPage = () => {
     setCurrentPage(Math.max(currentPage - 1, 1));
   };
-
-  // Filter Bar component
-  const FilterBar = () => (
-    <div className="mb-6">
-      <div className="text-sm text-gray-600 mb-2">Filter by Analysis:</div>
-      <div className="flex flex-wrap gap-2">
-        {filterLabels.map((label) => (
-          <button
-            key={label}
-            onClick={() => {
-              setActiveFilter(activeFilter === label ? null : label);
-              setCurrentPage(1);
-            }}
-            className={`px-3 py-1 rounded-full text-sm ${
-              activeFilter === label
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            {label}
-            {activeFilter === label && (
-              <span className="ml-2">×</span>
-            )}
-          </button>
-        ))}
-        {activeFilter && (
-          <button
-            onClick={() => {
-              setActiveFilter(null);
-              setCurrentPage(1);
-            }}
-            className="px-3 py-1 rounded-full text-sm text-red-600 hover:bg-red-50"
-          >
-            Clear Filter
-          </button>
-        )}
-      </div>
-    </div>
-  );
 
   // Render Grid View
   const renderGridView = () => (
@@ -466,6 +515,19 @@ export default function StocksPage() {
       );
     }
 
+    if (filteredStocks.length === 0) {
+      return (
+        <div className="flex justify-center items-center min-h-[400px]">
+          <div className="text-center bg-gray-50 p-8 rounded-lg max-w-md">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">No Matching Stocks</h3>
+            <p className="text-gray-600">
+              No stocks match your current search criteria. Try adjusting your filters or search query.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     return displayMode === 'grid' ? renderGridView() : renderTableView();
   };
 
@@ -475,8 +537,10 @@ export default function StocksPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Stock Analysis</h1>
           <p className="mt-2 text-gray-600">
-            {activeFilter 
-              ? `Filtered by "${activeFilter}" and sorted by Lynch Score`
+            {activeFilters.length > 0 || searchQuery
+              ? `${filteredStocks.length} stocks found ${searchQuery ? `matching "${searchQuery}"` : ''} ${
+                  activeFilters.length > 0 ? `with ${activeFilters.length} filters` : ''
+                }`
               : 'Sorted by Lynch Score (Highest First)'}
           </p>
         </div>
@@ -510,7 +574,15 @@ export default function StocksPage() {
         </div>
       </div>
       
-      <FilterBar />
+      <SearchBar searchQuery={searchQuery} handleSearch={handleSearch} />
+      <FilterBar 
+        filterLabels={filterLabels}
+        activeFilters={activeFilters}
+        setActiveFilters={setActiveFilters}
+        searchQuery={searchQuery}
+        handleSearch={handleSearch}
+        setCurrentPage={setCurrentPage}
+      />
       {renderContent()}
     </DashboardLayout>
   );
