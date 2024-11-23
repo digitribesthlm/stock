@@ -1,8 +1,158 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 
+// Status options
+const STATUS_OPTIONS = ['Active', 'Potential Buy', 'Bought'];
+
+// Helper function to safely get nested number values
+const getNumberValue = (obj, path, defaultValue = 0) => {
+  if (!obj) return defaultValue;
+  
+  const value = path.split('.').reduce((acc, part) => acc && acc[part], obj);
+  
+  if (value && typeof value === 'object' && '$numberDouble' in value) {
+    return Number(value.$numberDouble);
+  }
+  
+  if (typeof value === 'number') {
+    return value;
+  }
+  
+  return defaultValue;
+};
+
+// Filter labels
+const FILTER_LABELS = [
+  'Good PEG ratio',
+  'Good insider ownership',
+  'Low debt',
+  'Strong growth',
+  'Strong margins',
+  'Low institutional ownership'
+];
+
+// Status Controls Component
+const StatusControls = React.memo(({ currentStatus, stockId, onStatusChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [error, setError] = useState(null);
+
+  const updateStatus = async (newStatus) => {
+    if (newStatus === currentStatus) {
+      setIsOpen(false);
+      return;
+    }
+
+    setIsUpdating(true);
+    setError(null);
+
+    try {
+      const mongoId = stockId?.$oid || stockId;
+      const response = await fetch('/api/update-stock-status', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          stockId: mongoId,
+          status: newStatus
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to update status');
+      }
+
+      onStatusChange(mongoId, data.stock.status, data.stock.lastUpdated);
+    } catch (error) {
+      console.error('Error updating status:', error);
+      setError(error.message);
+      onStatusChange(stockId, currentStatus);
+    } finally {
+      setIsUpdating(false);
+      setIsOpen(false);
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Potential Buy':
+        return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200';
+      case 'Bought':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-blue-100 text-blue-800';
+    }
+  };
+
+  if (currentStatus === 'Potential Buy') {
+    return (
+      <div className="relative">
+        <button
+          onClick={() => updateStatus('Bought')}
+          disabled={isUpdating}
+          className="px-3 py-1 rounded-full text-xs leading-5 font-semibold bg-yellow-100 text-yellow-800 hover:bg-green-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isUpdating ? 'Updating...' : '🎯 Buy Now'}
+        </button>
+        {error && (
+          <div className="absolute top-full left-0 mt-1 text-xs text-red-600 bg-white p-1 rounded shadow-sm">
+            {error}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={isUpdating}
+        className={`px-3 py-1 rounded-full text-xs leading-5 font-semibold 
+          ${getStatusColor(currentStatus)}
+          ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}
+      >
+        {isUpdating ? 'Updating...' : currentStatus || 'Active'}
+      </button>
+      
+      {error && (
+        <div className="absolute top-full left-0 mt-1 text-xs text-red-600 bg-white p-1 rounded shadow-sm">
+          {error}
+        </div>
+      )}
+      
+      {isOpen && (
+        <div className="absolute z-10 mt-1 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5">
+          <div className="py-1" role="menu">
+            {STATUS_OPTIONS.map((status) => (
+              <button
+                key={status}
+                onClick={() => updateStatus(status)}
+                disabled={isUpdating}
+                className={`block w-full text-left px-4 py-2 text-sm 
+                  ${status === currentStatus 
+                    ? 'bg-gray-100 text-gray-900' 
+                    : 'text-gray-700 hover:bg-gray-50'}
+                  ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                role="menuitem"
+              >
+                {status}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+StatusControls.displayName = 'StatusControls';
+
 // Search Bar Component
-const SearchBar = ({ searchQuery, handleSearch }) => (
+const SearchBar = React.memo(({ searchQuery, handleSearch }) => (
   <div className="mb-6">
     <div className="relative">
       <input
@@ -25,10 +175,12 @@ const SearchBar = ({ searchQuery, handleSearch }) => (
       )}
     </div>
   </div>
-);
+));
+
+SearchBar.displayName = 'SearchBar';
 
 // Filter Bar Component
-const FilterBar = ({ filterLabels, activeFilters, setActiveFilters, searchQuery, handleSearch, setCurrentPage }) => (
+const FilterBar = React.memo(({ filterLabels, activeFilters, setActiveFilters, searchQuery, handleSearch, setCurrentPage }) => (
   <div className="mb-6">
     <div className="text-sm text-gray-600 mb-2">Filter by Analysis:</div>
     <div className="flex flex-wrap gap-2">
@@ -72,9 +224,12 @@ const FilterBar = ({ filterLabels, activeFilters, setActiveFilters, searchQuery,
       )}
     </div>
   </div>
-);
+));
 
-export default function StocksPage() {
+FilterBar.displayName = 'FilterBar';
+
+// Main Page Component
+const StocksPage = () => {
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -82,31 +237,51 @@ export default function StocksPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [activeFilters, setActiveFilters] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const itemsPerPage = 9;
-  const tableItemsPerPage = 10;
-
-  // Debounced search handler
-  const handleSearch = useCallback((value) => {
-    setSearchQuery(value);
-    setCurrentPage(1);
-  }, []);
-
-  // Initial sort config to Lynch Score descending
   const [sortConfig, setSortConfig] = useState({
     key: 'lynchScore',
     direction: 'descending'
   });
 
-  // Filter labels
-  const filterLabels = [
-    'Good PEG ratio',
-    'Good insider ownership',
-    'Low debt',
-    'Strong growth',
-    'Strong margins',
-    'Low institutional ownership'
-  ];
+  const itemsPerPage = 9;
+  const tableItemsPerPage = 10;
 
+  // Handlers
+  const handleSearch = useCallback((value) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  }, []);
+
+  const handleStatusChange = useCallback((stockId, newStatus, lastUpdated) => {
+    setStocks(prevStocks => 
+      prevStocks.map(stock => {
+        const stockMongoId = stock._id?.$oid || stock._id;
+        const updateMongoId = stockId?.$oid || stockId;
+        
+        return stockMongoId === updateMongoId
+          ? { 
+              ...stock, 
+              metadata: { 
+                ...stock.metadata, 
+                status: newStatus,
+                lastUpdated: lastUpdated || new Date().toISOString()
+              } 
+            }
+          : stock;
+      })
+    );
+  }, []);
+
+  const handleSort = useCallback((key) => {
+    setSortConfig(prevConfig => ({
+      key,
+      direction: prevConfig.key === key && prevConfig.direction === 'ascending' 
+        ? 'descending' 
+        : 'ascending'
+    }));
+    setCurrentPage(1);
+  }, []);
+
+  // Fetch stocks data
   useEffect(() => {
     const fetchStocks = async () => {
       try {
@@ -132,14 +307,12 @@ export default function StocksPage() {
     fetchStocks();
   }, []);
 
-  // Filter stocks based on active filters and search query
+  // Filter stocks
   const filteredStocks = useMemo(() => {
     return stocks.filter(stock => {
-      // Apply ticker search filter
       const matchesSearch = searchQuery === '' || 
         stock.ticker.toLowerCase().includes(searchQuery.toLowerCase());
 
-      // Apply label filters
       const matchesLabels = activeFilters.length === 0 || 
         activeFilters.every(filter =>
           stock.analysis?.reasons?.some(reason => 
@@ -151,24 +324,7 @@ export default function StocksPage() {
     });
   }, [stocks, activeFilters, searchQuery]);
 
-  // Helper function to safely get nested number values
-  const getNumberValue = (obj, path, defaultValue = 0) => {
-    if (!obj) return defaultValue;
-    
-    const value = path.split('.').reduce((acc, part) => acc && acc[part], obj);
-    
-    if (value && typeof value === 'object' && '$numberDouble' in value) {
-      return Number(value.$numberDouble);
-    }
-    
-    if (typeof value === 'number') {
-      return value;
-    }
-    
-    return defaultValue;
-  };
-
-  // Sorting function
+  // Sort stocks
   const sortedStocks = useMemo(() => {
     if (!filteredStocks.length) return filteredStocks;
 
@@ -225,48 +381,37 @@ export default function StocksPage() {
     return sortedStocks.slice(startIndex, startIndex + pageSize);
   }, [sortedStocks, currentPage, displayMode]);
 
-  // Total pages calculation
   const totalPages = useMemo(() => {
     const pageSize = displayMode === 'grid' ? itemsPerPage : tableItemsPerPage;
     return Math.ceil(sortedStocks.length / pageSize);
   }, [sortedStocks, displayMode]);
 
-  // Sorting handler
-  const handleSort = (key) => {
-    setSortConfig(prevConfig => ({
-      key,
-      direction: prevConfig.key === key && prevConfig.direction === 'ascending' 
-        ? 'descending' 
-        : 'ascending'
-    }));
-    setCurrentPage(1);
-  };
+  const goToNextPage = useCallback(() => {
+    setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  }, [totalPages]);
 
-  // Pagination handlers
-  const goToNextPage = () => {
-    setCurrentPage(Math.min(currentPage + 1, totalPages));
-  };
+  const goToPreviousPage = useCallback(() => {
+    setCurrentPage(prev => Math.max(prev - 1, 1));
+  }, []);
 
-  const goToPreviousPage = () => {
-    setCurrentPage(Math.max(currentPage - 1, 1));
-  };
-
-  // Render Grid View
+  // Render functions
   const renderGridView = () => (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {paginatedStocks.map((stock) => (
-          <div key={stock._id?.$oid} className="bg-white rounded-lg shadow-lg p-6 space-y-4">
+          <div key={stock._id?.$oid || stock._id} className="bg-white rounded-lg shadow-lg p-6 space-y-4">
             <div className="flex justify-between items-start">
               <div>
                 <h2 className="text-2xl font-bold text-blue-600">{stock.ticker}</h2>
                 <h3 className="text-sm text-gray-500">{stock.company}</h3>
               </div>
               <div className="flex flex-col items-end">
-                <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs mb-2">
-                  {stock.metadata?.status || 'Unknown'}
-                </span>
-                <span className="text-xs text-gray-500">
+                <StatusControls 
+                  currentStatus={stock.metadata?.status || 'Active'} 
+                  stockId={stock._id}
+                  onStatusChange={handleStatusChange}
+                />
+                <span className="text-xs text-gray-500 mt-2">
                   Updated: {new Date(Number(stock.metadata?.lastUpdated?.$date?.$numberLong)).toLocaleDateString()}
                 </span>
               </div>
@@ -357,7 +502,6 @@ export default function StocksPage() {
         ))}
       </div>
       
-      {/* Pagination Controls */}
       <div className="flex justify-center items-center mt-8 space-x-4">
         <button 
           onClick={goToPreviousPage} 
@@ -388,7 +532,6 @@ export default function StocksPage() {
     </>
   );
 
-  // Render Table View
   const renderTableView = () => (
     <>
       <div className="bg-white shadow-md rounded-lg overflow-x-auto">
@@ -423,7 +566,7 @@ export default function StocksPage() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {paginatedStocks.map((stock) => (
-              <tr key={stock._id?.$oid} className="hover:bg-gray-50">
+              <tr key={stock._id?.$oid || stock._id} className="hover:bg-gray-50">
                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{stock.ticker}</td>
                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{stock.company}</td>
                 <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
@@ -439,9 +582,11 @@ export default function StocksPage() {
                   {(getNumberValue(stock.metrics, 'profitMargins') * 100).toFixed(1)}%
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
-                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                    {stock.metadata?.status || 'Unknown'}
-                  </span>
+                  <StatusControls 
+                    currentStatus={stock.metadata?.status || 'Active'} 
+                    stockId={stock._id}
+                    onStatusChange={handleStatusChange}
+                  />
                 </td>
               </tr>
             ))}
@@ -449,7 +594,6 @@ export default function StocksPage() {
         </table>
       </div>
       
-      {/* Pagination Controls */}
       <div className="flex justify-center items-center mt-8 space-x-4">
         <button 
           onClick={goToPreviousPage} 
@@ -480,7 +624,6 @@ export default function StocksPage() {
     </>
   );
 
-  // Render Content method
   const renderContent = () => {
     if (loading) {
       return (
@@ -576,7 +719,7 @@ export default function StocksPage() {
       
       <SearchBar searchQuery={searchQuery} handleSearch={handleSearch} />
       <FilterBar 
-        filterLabels={filterLabels}
+        filterLabels={FILTER_LABELS}
         activeFilters={activeFilters}
         setActiveFilters={setActiveFilters}
         searchQuery={searchQuery}
@@ -586,4 +729,6 @@ export default function StocksPage() {
       {renderContent()}
     </DashboardLayout>
   );
-}
+};
+
+export default StocksPage;
