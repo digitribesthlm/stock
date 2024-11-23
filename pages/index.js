@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import styles from '../styles/modal.module.css'; // Import the modal styles as a CSS Module
 
 export default function WelcomePage() {
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -87,21 +88,18 @@ export default function WelcomePage() {
         <div className="container mx-auto px-8 py-16">
           <div className="grid md:grid-cols-3 gap-8">
             <div className="bg-white p-6 rounded-lg shadow-md">
-              <div className="text-4xl mb-4 text-blue-600">🧠</div>
-              <h3 className="text-xl font-semibold mb-4">AI-Driven Classification</h3>
+              <h3 className="text-xl font-semibold mb-4">Outsourced Analysis</h3>
               <p className="text-gray-600">
-                Our advanced AI model analyzes thousands of stocks, identifying hidden patterns and potential investment opportunities beyond traditional metrics.
+                We outsource the analysis to trusted partners, ensuring high-quality insights without the need for an in-house AI model.
               </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-md">
-              <div className="text-4xl mb-4 text-green-600">📈</div>
               <h3 className="text-xl font-semibold mb-4">Peter Lynch Strategy</h3>
               <p className="text-gray-600">
                 Leveraging the legendary investor's approach of understanding businesses, we help you find stocks with strong fundamentals and growth potential.
               </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-md">
-              <div className="text-4xl mb-4 text-purple-600">🔍</div>
               <h3 className="text-xl font-semibold mb-4">Comprehensive Analysis</h3>
               <p className="text-gray-600">
                 Deep dive into company metrics, insider ownership, earnings growth, and market positioning to make informed investment decisions.
@@ -129,11 +127,10 @@ export default function WelcomePage() {
 
       <Footer />
 
-      {/* Login Modal - Unchanged from previous implementation */}
+      {/* Login Modal */}
       {showLoginModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full relative">
-            {/* Login modal content remains the same as in previous implementation */}
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal}>
             <button 
               onClick={() => setShowLoginModal(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
