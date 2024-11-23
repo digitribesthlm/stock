@@ -7,14 +7,25 @@ export default function StocksPage() {
   const [error, setError] = useState(null);
   const [displayMode, setDisplayMode] = useState('grid');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 9; // For grid view, 9 items per page
-  const tableItemsPerPage = 10; // For table view, 10 items per page
+  const [activeFilter, setActiveFilter] = useState(null);
+  const itemsPerPage = 9;
+  const tableItemsPerPage = 10;
 
-  // Initialize sort config to Lynch Score descending
+  // Initial sort config to Lynch Score descending
   const [sortConfig, setSortConfig] = useState({
     key: 'lynchScore',
     direction: 'descending'
   });
+
+  // Filter labels
+  const filterLabels = [
+    'Good PEG ratio',
+    'Good insider ownership',
+    'Low debt',
+    'Strong growth',
+    'Strong margins',
+    'Low institutional ownership'
+  ];
 
   useEffect(() => {
     const fetchStocks = async () => {
@@ -41,6 +52,17 @@ export default function StocksPage() {
     fetchStocks();
   }, []);
 
+  // Filter stocks based on active filter
+  const filteredStocks = useMemo(() => {
+    if (!activeFilter) return stocks;
+    
+    return stocks.filter(stock => 
+      stock.analysis?.reasons?.some(reason => 
+        reason.toLowerCase().includes(activeFilter.toLowerCase())
+      )
+    );
+  }, [stocks, activeFilter]);
+
   // Helper function to safely get nested number values
   const getNumberValue = (obj, path, defaultValue = 0) => {
     if (!obj) return defaultValue;
@@ -60,9 +82,9 @@ export default function StocksPage() {
 
   // Sorting function
   const sortedStocks = useMemo(() => {
-    if (!stocks.length) return stocks;
+    if (!filteredStocks.length) return filteredStocks;
 
-    return [...stocks].sort((a, b) => {
+    return [...filteredStocks].sort((a, b) => {
       let aValue, bValue;
 
       switch(sortConfig.key) {
@@ -106,7 +128,7 @@ export default function StocksPage() {
       }
       return 0;
     });
-  }, [stocks, sortConfig]);
+  }, [filteredStocks, sortConfig]);
 
   // Pagination
   const paginatedStocks = useMemo(() => {
@@ -140,6 +162,45 @@ export default function StocksPage() {
   const goToPreviousPage = () => {
     setCurrentPage(Math.max(currentPage - 1, 1));
   };
+
+  // Filter Bar component
+  const FilterBar = () => (
+    <div className="mb-6">
+      <div className="text-sm text-gray-600 mb-2">Filter by Analysis:</div>
+      <div className="flex flex-wrap gap-2">
+        {filterLabels.map((label) => (
+          <button
+            key={label}
+            onClick={() => {
+              setActiveFilter(activeFilter === label ? null : label);
+              setCurrentPage(1);
+            }}
+            className={`px-3 py-1 rounded-full text-sm ${
+              activeFilter === label
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {label}
+            {activeFilter === label && (
+              <span className="ml-2">×</span>
+            )}
+          </button>
+        ))}
+        {activeFilter && (
+          <button
+            onClick={() => {
+              setActiveFilter(null);
+              setCurrentPage(1);
+            }}
+            className="px-3 py-1 rounded-full text-sm text-red-600 hover:bg-red-50"
+          >
+            Clear Filter
+          </button>
+        )}
+      </div>
+    </div>
+  );
 
   // Render Grid View
   const renderGridView = () => (
@@ -413,7 +474,11 @@ export default function StocksPage() {
       <div className="mb-8 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Stock Analysis</h1>
-          <p className="mt-2 text-gray-600">Sorted by Lynch Score (Highest First)</p>
+          <p className="mt-2 text-gray-600">
+            {activeFilter 
+              ? `Filtered by "${activeFilter}" and sorted by Lynch Score`
+              : 'Sorted by Lynch Score (Highest First)'}
+          </p>
         </div>
         <div className="flex space-x-2">
           <button 
@@ -444,6 +509,8 @@ export default function StocksPage() {
           </button>
         </div>
       </div>
+      
+      <FilterBar />
       {renderContent()}
     </DashboardLayout>
   );
