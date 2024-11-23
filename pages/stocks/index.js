@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 
 // Status options
@@ -21,18 +22,8 @@ const getNumberValue = (obj, path, defaultValue = 0) => {
   return defaultValue;
 };
 
-// Filter labels
-const FILTER_LABELS = [
-  'Good PEG ratio',
-  'Good insider ownership',
-  'Low debt',
-  'Strong growth',
-  'Strong margins',
-  'Low institutional ownership'
-];
-
 // Status Controls Component
-const StatusControls = React.memo(({ currentStatus, stockId, onStatusChange }) => {
+function StatusControls({ currentStatus, stockId, onStatusChange }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState(null);
@@ -87,31 +78,12 @@ const StatusControls = React.memo(({ currentStatus, stockId, onStatusChange }) =
     }
   };
 
-  if (currentStatus === 'Potential Buy') {
-    return (
-      <div className="relative">
-        <button
-          onClick={() => updateStatus('Bought')}
-          disabled={isUpdating}
-          className="px-3 py-1 rounded-full text-xs leading-5 font-semibold bg-yellow-100 text-yellow-800 hover:bg-green-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isUpdating ? 'Updating...' : '🎯 Buy Now'}
-        </button>
-        {error && (
-          <div className="absolute top-full left-0 mt-1 text-xs text-red-600 bg-white p-1 rounded shadow-sm">
-            {error}
-          </div>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={isUpdating}
-        className={`px-3 py-1 rounded-full text-xs leading-5 font-semibold 
+        className={`px-2 py-1 rounded-full text-xs leading-5 font-semibold 
           ${getStatusColor(currentStatus)}
           ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
@@ -147,89 +119,87 @@ const StatusControls = React.memo(({ currentStatus, stockId, onStatusChange }) =
       )}
     </div>
   );
-});
-
-StatusControls.displayName = 'StatusControls';
+}
 
 // Search Bar Component
-const SearchBar = React.memo(({ searchQuery, handleSearch }) => (
-  <div className="mb-6">
-    <div className="relative">
-      <input
-        type="text"
-        placeholder="Search by ticker symbol..."
-        value={searchQuery}
-        onChange={(e) => handleSearch(e.target.value)}
-        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:outline-none"
-        autoComplete="off"
-        spellCheck="false"
-      />
-      {searchQuery && (
-        <button
-          onClick={() => handleSearch('')}
-          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-          type="button"
-        >
-          ×
-        </button>
-      )}
+function SearchBar({ searchQuery, handleSearch }) {
+  return (
+    <div className="mb-6">
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Search by ticker symbol..."
+          value={searchQuery}
+          onChange={(e) => handleSearch(e.target.value)}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:outline-none"
+          autoComplete="off"
+          spellCheck="false"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => handleSearch('')}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            type="button"
+          >
+            ×
+          </button>
+        )}
+      </div>
     </div>
-  </div>
-));
-
-SearchBar.displayName = 'SearchBar';
+  );
+}
 
 // Filter Bar Component
-const FilterBar = React.memo(({ filterLabels, activeFilters, setActiveFilters, searchQuery, handleSearch, setCurrentPage }) => (
-  <div className="mb-6">
-    <div className="text-sm text-gray-600 mb-2">Filter by Analysis:</div>
-    <div className="flex flex-wrap gap-2">
-      {filterLabels.map((label) => (
-        <button
-          key={label}
-          onClick={() => {
-            setActiveFilters(prev => {
-              const isActive = prev.includes(label);
-              if (isActive) {
-                return prev.filter(f => f !== label);
-              } else {
-                return [...prev, label];
-              }
-            });
-            setCurrentPage(1);
-          }}
-          className={`px-3 py-1 rounded-full text-sm ${
-            activeFilters.includes(label)
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          {label}
-          {activeFilters.includes(label) && (
-            <span className="ml-2">×</span>
-          )}
-        </button>
-      ))}
-      {(activeFilters.length > 0 || searchQuery) && (
-        <button
-          onClick={() => {
-            setActiveFilters([]);
-            handleSearch('');
-            setCurrentPage(1);
-          }}
-          className="px-3 py-1 rounded-full text-sm text-red-600 hover:bg-red-50"
-        >
-          Clear All
-        </button>
-      )}
+function FilterBar({ filterLabels, activeFilters, setActiveFilters, searchQuery, handleSearch, setCurrentPage }) {
+  return (
+    <div className="mb-6">
+      <div className="text-sm text-gray-600 mb-2">Filter by Analysis:</div>
+      <div className="flex flex-wrap gap-2">
+        {filterLabels.map((label) => (
+          <button
+            key={label}
+            onClick={() => {
+              setActiveFilters(prev => {
+                const isActive = prev.includes(label);
+                if (isActive) {
+                  return prev.filter(f => f !== label);
+                } else {
+                  return [...prev, label];
+                }
+              });
+              setCurrentPage(1);
+            }}
+            className={`px-3 py-1 rounded-full text-sm ${
+              activeFilters.includes(label)
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {label}
+            {activeFilters.includes(label) && (
+              <span className="ml-2">×</span>
+            )}
+          </button>
+        ))}
+        {(activeFilters.length > 0 || searchQuery) && (
+          <button
+            onClick={() => {
+              setActiveFilters([]);
+              handleSearch('');
+              setCurrentPage(1);
+            }}
+            className="px-3 py-1 rounded-full text-sm text-red-600 hover:bg-red-50"
+          >
+            Clear All
+          </button>
+        )}
+      </div>
     </div>
-  </div>
-));
-
-FilterBar.displayName = 'FilterBar';
+  );
+}
 
 // Main Page Component
-const StocksPage = () => {
+export default function StocksPage() {
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -244,6 +214,16 @@ const StocksPage = () => {
 
   const itemsPerPage = 9;
   const tableItemsPerPage = 10;
+
+  // Filter labels
+  const filterLabels = [
+    'Good PEG ratio',
+    'Good insider ownership',
+    'Low debt',
+    'Strong growth',
+    'Strong margins',
+    'Low institutional ownership'
+  ];
 
   // Handlers
   const handleSearch = useCallback((value) => {
@@ -310,9 +290,11 @@ const StocksPage = () => {
   // Filter stocks
   const filteredStocks = useMemo(() => {
     return stocks.filter(stock => {
+      // Apply ticker search filter
       const matchesSearch = searchQuery === '' || 
         stock.ticker.toLowerCase().includes(searchQuery.toLowerCase());
 
+      // Apply label filters
       const matchesLabels = activeFilters.length === 0 || 
         activeFilters.every(filter =>
           stock.analysis?.reasons?.some(reason => 
@@ -394,7 +376,58 @@ const StocksPage = () => {
     setCurrentPage(prev => Math.max(prev - 1, 1));
   }, []);
 
-  // Render functions
+  // Render Content method
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading stock data...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="flex justify-center items-center min-h-[400px]">
+          <div className="text-center bg-red-50 p-8 rounded-lg max-w-md">
+            <h3 className="text-lg font-semibold text-red-800 mb-2">Error Loading Data</h3>
+            <p className="text-red-600">{error}</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!stocks || stocks.length === 0) {
+      return (
+        <div className="flex justify-center items-center min-h-[400px]">
+          <div className="text-center bg-gray-50 p-8 rounded-lg max-w-md">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">No Stocks Found</h3>
+            <p className="text-gray-600">There are currently no stocks in the database.</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (filteredStocks.length === 0) {
+      return (
+        <div className="flex justify-center items-center min-h-[400px]">
+          <div className="text-center bg-gray-50 p-8 rounded-lg max-w-md">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">No Matching Stocks</h3>
+            <p className="text-gray-600">
+              No stocks match your current search criteria. Try adjusting your filters or search query.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return displayMode === 'grid' ? renderGridView() : renderTableView();
+  };
+
+  // Render Grid View
   const renderGridView = () => (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -532,6 +565,7 @@ const StocksPage = () => {
     </>
   );
 
+  // Render Table View
   const renderTableView = () => (
     <>
       <div className="bg-white shadow-md rounded-lg overflow-x-auto">
@@ -624,56 +658,6 @@ const StocksPage = () => {
     </>
   );
 
-  const renderContent = () => {
-    if (loading) {
-      return (
-        <div className="flex justify-center items-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading stock data...</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (error) {
-      return (
-        <div className="flex justify-center items-center min-h-[400px]">
-          <div className="text-center bg-red-50 p-8 rounded-lg max-w-md">
-            <h3 className="text-lg font-semibold text-red-800 mb-2">Error Loading Data</h3>
-            <p className="text-red-600">{error}</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (!stocks || stocks.length === 0) {
-      return (
-        <div className="flex justify-center items-center min-h-[400px]">
-          <div className="text-center bg-gray-50 p-8 rounded-lg max-w-md">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">No Stocks Found</h3>
-            <p className="text-gray-600">There are currently no stocks in the database.</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (filteredStocks.length === 0) {
-      return (
-        <div className="flex justify-center items-center min-h-[400px]">
-          <div className="text-center bg-gray-50 p-8 rounded-lg max-w-md">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">No Matching Stocks</h3>
-            <p className="text-gray-600">
-              No stocks match your current search criteria. Try adjusting your filters or search query.
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    return displayMode === 'grid' ? renderGridView() : renderTableView();
-  };
-
   return (
     <DashboardLayout>
       <div className="mb-8 flex justify-between items-center">
@@ -719,7 +703,7 @@ const StocksPage = () => {
       
       <SearchBar searchQuery={searchQuery} handleSearch={handleSearch} />
       <FilterBar 
-        filterLabels={FILTER_LABELS}
+        filterLabels={filterLabels}
         activeFilters={activeFilters}
         setActiveFilters={setActiveFilters}
         searchQuery={searchQuery}
@@ -729,6 +713,4 @@ const StocksPage = () => {
       {renderContent()}
     </DashboardLayout>
   );
-};
-
-export default StocksPage;
+}
