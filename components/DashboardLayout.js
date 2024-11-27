@@ -62,6 +62,12 @@ export default function DashboardLayout({ children }) {
                   Stocks
                 </Link>
                 <Link 
+                  href="/dashboard/holdings" 
+                  className={`text-gray-600 hover:text-gray-900 ${router.pathname === '/dashboard/holdings' ? 'text-blue-600 font-medium' : ''}`}
+                >
+                  Holdings
+                </Link>
+                <Link 
                   href="/dashboard/analytics" 
                   className={`text-gray-600 hover:text-gray-900 ${router.pathname === '/dashboard/analytics' ? 'text-blue-600 font-medium' : ''}`}
                 >
