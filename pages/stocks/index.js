@@ -22,6 +22,46 @@ const getNumberValue = (obj, path, defaultValue = 0) => {
   return defaultValue;
 };
 
+// Helper function to format MongoDB date
+const formatMongoDate = (mongoDate) => {
+  if (!mongoDate) return 'N/A';
+  
+  try {
+    // Handle nested MongoDB date format
+    let timestamp;
+    if (mongoDate.$date && mongoDate.$date.$numberLong) {
+      timestamp = mongoDate.$date.$numberLong;
+    } else if (mongoDate.$date) {
+      timestamp = mongoDate.$date;
+    } else {
+      timestamp = mongoDate;
+    }
+    
+    const date = new Date(Number(timestamp));
+    if (isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleDateString();
+  } catch (error) {
+    console.error('Date parsing error:', error);
+    return 'N/A';
+  }
+};
+
+// Helper function to calculate percentage change
+const getScoreChange = (stock) => {
+  if (!stock.history || stock.history.length === 0) return null;
+  
+  const currentScore = getNumberValue(stock.analysis, 'lynchScore');
+  const lastHistoricalScore = getNumberValue(stock.history[stock.history.length - 1].analysis, 'lynchScore');
+  
+  if (lastHistoricalScore === 0) return null;
+  
+  const percentageChange = ((currentScore - lastHistoricalScore) / lastHistoricalScore) * 100;
+  return {
+    percentage: percentageChange,
+    direction: percentageChange >= 0 ? 'up' : 'down'
+  };
+};
+
 // Status Controls Component
 function StatusControls({ currentStatus, stockId, onStatusChange }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -269,16 +309,32 @@ export default function StocksPage() {
         setError(null);
         const response = await fetch('/api/stock-details');
         
+        // First check if the response is OK
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to fetch stock data');
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Try to get the content type
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error(`Expected JSON response but got ${contentType}`);
+        }
+
+        // Parse the JSON response
+        const data = await response.json();
+        
+        // Validate the data structure
+        if (!Array.isArray(data)) {
+          throw new Error('Expected an array of stocks');
         }
         
-        const data = await response.json();
         setStocks(data);
       } catch (error) {
-        console.error('Error fetching stocks:', error);
-        setError(error.message);
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+        });
+        setError(`Failed to fetch stock data: ${error.message}`);
       } finally {
         setLoading(false);
       }
@@ -436,7 +492,10 @@ export default function StocksPage() {
             <div className="flex justify-between items-start">
               <div>
                 <h2 className="text-2xl font-bold text-blue-600">{stock.ticker}</h2>
-                <h3 className="text-sm text-gray-500">{stock.company}</h3>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-sm text-gray-500">{stock.company}</h3>
+                  <span className="text-xs px-2 py-1 bg-gray-100 rounded-full text-gray-600">{stock.companySize}</span>
+                </div>
               </div>
               <div className="flex flex-col items-end">
                 <StatusControls 
@@ -445,7 +504,7 @@ export default function StocksPage() {
                   onStatusChange={handleStatusChange}
                 />
                 <span className="text-xs text-gray-500 mt-2">
-                  Updated: {new Date(Number(stock.metadata?.lastUpdated?.$date?.$numberLong)).toLocaleDateString()}
+                  Updated: {formatMongoDate(stock.metadata?.lastUpdated)}
                 </span>
               </div>
             </div>
@@ -454,8 +513,22 @@ export default function StocksPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="text-xs text-gray-500 mb-1">Lynch Score</div>
-                  <div className="font-semibold text-blue-600 text-lg">
-                    {getNumberValue(stock.analysis, 'lynchScore').toFixed(2)}
+                  <div className="flex items-center space-x-2">
+                    <div className="font-semibold text-blue-600 text-lg">
+                      {getNumberValue(stock.analysis, 'lynchScore').toFixed(2)}
+                    </div>
+                    {(() => {
+                      const change = getScoreChange(stock);
+                      if (change) {
+                        return (
+                          <div className={`text-sm ${change.direction === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+                            <span>{change.direction === 'up' ? '▲' : '▼'}</span>
+                            <span className="ml-1">{Math.abs(change.percentage).toFixed(1)}%</span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </div>
                 <div>
@@ -575,6 +648,7 @@ export default function StocksPage() {
               {[
                 { key: 'ticker', label: 'Ticker' },
                 { key: 'company', label: 'Company' },
+                { key: 'companySize', label: 'Size' },
                 { key: 'lynchScore', label: 'Lynch Score' },
                 { key: 'pegRatio', label: 'PEG Ratio' },
                 { key: 'earningsGrowth', label: 'Earnings Growth' },
@@ -603,8 +677,25 @@ export default function StocksPage() {
               <tr key={stock._id?.$oid || stock._id} className="hover:bg-gray-50">
                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{stock.ticker}</td>
                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{stock.company}</td>
-                <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
-                  {getNumberValue(stock.analysis, 'lynchScore').toFixed(2)}
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{stock.companySize}</td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-semibold text-blue-600">
+                      {getNumberValue(stock.analysis, 'lynchScore').toFixed(2)}
+                    </span>
+                    {(() => {
+                      const change = getScoreChange(stock);
+                      if (change) {
+                        return (
+                          <span className={`${change.direction === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+                            {change.direction === 'up' ? '▲' : '▼'}
+                            <span className="ml-1">{Math.abs(change.percentage).toFixed(1)}%</span>
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                   {getNumberValue(stock.metrics, 'pegRatio').toFixed(2)}
