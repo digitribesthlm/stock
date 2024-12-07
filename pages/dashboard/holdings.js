@@ -319,11 +319,11 @@ export default function Holdings() {
                     <td className="px-6 py-4 whitespace-nowrap">{holding.shares}</td>
                     <td className="px-6 py-4 whitespace-nowrap">${parseFloat(holding.purchasePrice).toFixed(2)}</td>
                     <td className="px-6 py-4 whitespace-nowrap">${calculateTotalValue(holding).toFixed(2)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{holding.pegRatio}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{holding.insiderOwnership}%</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{holding.debtToEquity}%</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{holding.growthRate}%</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{holding.profitMargins}%</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{holding.pegRatio.toFixed(1)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{holding.insiderOwnership.toFixed(1)}%</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{holding.debtToEquity.toFixed(1)}%</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{holding.growthRate.toFixed(1)}%</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{holding.profitMargins.toFixed(1)}%</td>
                     <td className="px-6 py-4 whitespace-nowrap capitalize">{holding.category}</td>
                     <td className="px-6 py-4">{holding.notes}</td>
                   </tr>
