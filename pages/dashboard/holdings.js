@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 
 export default function Holdings() {
   const [holdings, setHoldings] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
     symbol: '',
     shares: '',
@@ -17,22 +19,102 @@ export default function Holdings() {
     notes: ''
   });
 
-  const handleSubmit = (e) => {
+  // Add fetch effect to load holdings from MongoDB
+  useEffect(() => {
+    const fetchHoldings = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch('/api/holdings');
+        const data = await response.json();
+        
+        // Transform MongoDB data to match your current state structure
+        const transformedHoldings = data.map(holding => ({
+          id: holding._id,
+          symbol: holding.symbol,
+          shares: holding.quantity,
+          purchasePrice: holding.averageEntryPrice,
+          purchaseDate: new Date(holding.transactions[0].date).toISOString().split('T')[0],
+          category: holding.currentAnalysis.category,
+          pegRatio: holding.currentAnalysis.pegRatio,
+          insiderOwnership: holding.currentAnalysis.insiderOwnership * 100, // Convert to percentage
+          debtToEquity: holding.currentAnalysis.debtEquityRatio,
+          growthRate: holding.currentAnalysis.earningsGrowth * 100, // Convert to percentage
+          profitMargins: holding.currentAnalysis.profitMargins * 100, // Convert to percentage
+          notes: holding.currentAnalysis.notes
+        }));
+        
+        setHoldings(transformedHoldings);
+      } catch (error) {
+        setError('Failed to fetch holdings');
+        console.error('Error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHoldings();
+  }, []);
+
+  // Modify handleSubmit to save to MongoDB
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setHoldings([...holdings, { ...formData, id: Date.now() }]);
-    setFormData({
-      symbol: '',
-      shares: '',
-      purchasePrice: '',
-      purchaseDate: new Date().toISOString().split('T')[0],
-      category: 'growth',
-      pegRatio: '',
-      insiderOwnership: '',
-      debtToEquity: '',
-      growthRate: '',
-      profitMargins: '',
-      notes: ''
-    });
+    setLoading(true);
+    
+    try {
+      const response = await fetch('/api/holdings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          symbol: formData.symbol,
+          quantity: parseInt(formData.shares),
+          averageEntryPrice: parseFloat(formData.purchasePrice),
+          currentAnalysis: {
+            pegRatio: parseFloat(formData.pegRatio),
+            insiderOwnership: parseFloat(formData.insiderOwnership) / 100,
+            debtEquityRatio: parseFloat(formData.debtToEquity),
+            earningsGrowth: parseFloat(formData.growthRate) / 100,
+            profitMargins: parseFloat(formData.profitMargins) / 100,
+            category: formData.category,
+            notes: formData.notes
+          },
+          transactions: [{
+            date: new Date(formData.purchaseDate),
+            type: 'BUY',
+            quantity: parseInt(formData.shares),
+            pricePerShare: parseFloat(formData.purchasePrice)
+          }]
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to save holding');
+      
+      // Refresh holdings after save
+      const updatedResponse = await fetch('/api/holdings');
+      const updatedData = await updatedResponse.json();
+      setHoldings(updatedData);
+      
+      // Reset form
+      setFormData({
+        symbol: '',
+        shares: '',
+        purchasePrice: '',
+        purchaseDate: new Date().toISOString().split('T')[0],
+        category: 'growth',
+        pegRatio: '',
+        insiderOwnership: '',
+        debtToEquity: '',
+        growthRate: '',
+        profitMargins: '',
+        notes: ''
+      });
+    } catch (error) {
+      setError('Failed to save holding');
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (e) => {
