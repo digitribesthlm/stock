@@ -56,7 +56,7 @@ export default function StockDetail() {
     <DashboardLayout>
       <div className="p-6">
         <h1 className="text-2xl font-bold mb-4">Stock Detail: {ticker}</h1>
-        <p className="text-lg text-gray-700 mb-6">Hello {ticker}! Welcome to the stock detail page.</p>
+        <p className="text-lg text-gray-700 mb-6"> {ticker} Welcome to the stock detail page.</p>
         
         {loading ? (
           <div className="space-y-4">
