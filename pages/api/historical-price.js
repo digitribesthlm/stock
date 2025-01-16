@@ -2,34 +2,83 @@
 export default async function handler(req, res) {
   try {
     const { ticker } = req.query;
-    const apiKey = process.env.FMP_API_KEY;
     
-    // Get historical data for the past year
-    const response = await fetch(
-      `https://financialmodelingprep.com/api/v3/historical-price-full/${ticker}?from=${getOneYearAgo()}&apikey=${apiKey}`
-    );
+    console.log('Fetching data for ticker:', ticker);
     
-    const data = await response.json();
+    // Get historical data for the stock
+    console.log('Fetching stock data...');
+    const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=1y&interval=1d`);
     
-    if (!data.historical) {
-      throw new Error('No historical data available');
+    if (!response.ok) {
+      throw new Error(`Stock API request failed with status ${response.status}`);
     }
 
-    // Format the data for the chart
-    const chartData = data.historical.reverse().map(item => ({
-      date: item.date,
-      price: item.close
-    }));
+    const data = await response.json();
+    
+    if (!data.chart?.result?.[0]) {
+      throw new Error(`No historical data available for ${ticker}`);
+    }
 
-    res.status(200).json(chartData);
+    const stockData = data.chart.result[0];
+    const timestamps = stockData.timestamp;
+    const quotes = stockData.indicators.quote[0];
+    
+    // Create the chart data with closing prices (keeping chronological order)
+    const chartData = timestamps.map((timestamp, index) => {
+      const date = new Date(timestamp * 1000);
+      return {
+        date: date.toISOString(),
+        stockPrice: quotes.close[index],
+        stockNormalized: (quotes.close[index] / quotes.close[0]) * 100
+      };
+    }).filter(item => item.stockPrice !== null);
+
+    // Calculate percentage changes for different periods using reversed indices
+    const calculatePercentageChange = (days) => {
+      const lastIndex = chartData.length - 1;
+      if (chartData.length < days) {
+        return {
+          change: 0,
+          startPrice: chartData[0].stockPrice,
+          endPrice: chartData[lastIndex].stockPrice,
+          startDate: chartData[0].date,
+          endDate: chartData[lastIndex].date
+        };
+      }
+
+      const endPrice = chartData[lastIndex].stockPrice;
+      const startPrice = chartData[Math.max(lastIndex - days + 1, 0)].stockPrice;
+      const percentageChange = ((endPrice - startPrice) / startPrice) * 100;
+
+      return {
+        change: percentageChange,
+        startPrice: startPrice,
+        endPrice: endPrice,
+        startDate: chartData[Math.max(lastIndex - days + 1, 0)].date,
+        endDate: chartData[lastIndex].date
+      };
+    };
+
+    const periodChanges = {
+      '14d': calculatePercentageChange(14),
+      '30d': calculatePercentageChange(30),
+      '90d': calculatePercentageChange(90)
+    };
+
+    console.log('Successfully processed data');
+    res.status(200).json({
+      chartData,
+      metadata: {
+        stockSymbol: ticker,
+        periodChanges,
+        lastUpdated: new Date().toISOString()
+      }
+    });
   } catch (error) {
     console.error('API Error:', error);
-    res.status(500).json({ error: 'Failed to fetch historical data' });
+    res.status(500).json({ 
+      error: error.message || 'Failed to fetch historical data',
+      details: error.stack
+    });
   }
-}
-
-function getOneYearAgo() {
-  const date = new Date();
-  date.setFullYear(date.getFullYear() - 1);
-  return date.toISOString().split('T')[0];
 }

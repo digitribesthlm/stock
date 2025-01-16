@@ -2,6 +2,7 @@ import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../../../components/DashboardLayout';
 import StockChart from '../../../components/StockChart';
+import StockPeriodChanges from '../../../components/StockPeriodChanges';
 
 export default function StockDetail() {
   const router = useRouter();
@@ -18,12 +19,21 @@ export default function StockDetail() {
 
   const fetchHistoricalData = async () => {
     try {
+      setLoading(true);
+      setError(null);
       const response = await fetch(`/api/historical-price?ticker=${ticker}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch data');
+      }
       const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
       setHistoricalData(data);
-      setLoading(false);
     } catch (err) {
-      setError('Failed to fetch historical data');
+      console.error('Error fetching historical data:', err);
+      setError(err.message || 'Failed to fetch historical data');
+    } finally {
       setLoading(false);
     }
   };
@@ -48,13 +58,19 @@ export default function StockDetail() {
         <p className="text-lg text-gray-700 mb-6">Hello {ticker}! Welcome to the stock detail page.</p>
         
         {loading ? (
-          <div className="animate-pulse bg-gray-200 rounded h-[400px]"></div>
+          <div className="space-y-4">
+            <div className="animate-pulse bg-gray-200 rounded h-24 mb-4"></div>
+            <div className="animate-pulse bg-gray-200 rounded h-[400px]"></div>
+          </div>
         ) : error ? (
           <div className="text-red-500">{error}</div>
         ) : (
-          <div className="bg-white p-4 rounded-lg shadow">
-            <StockChart data={historicalData} />
-          </div>
+          <>
+            <StockPeriodChanges periodChanges={historicalData.metadata.periodChanges} />
+            <div className="bg-white p-4 rounded-lg shadow">
+              <StockChart data={historicalData.chartData} metadata={historicalData.metadata} />
+            </div>
+          </>
         )}
 
         <button 
