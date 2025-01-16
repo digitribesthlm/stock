@@ -48,6 +48,13 @@ export default function StockChart({ data, metadata }) {
         borderColor: 'rgb(75, 192, 192)',
         backgroundColor: 'rgba(75, 192, 192, 0.5)',
         tension: 0.1,
+      },
+      {
+        label: `NASDAQ ${showNormalized ? '(Normalized)' : '(Price)'}`,
+        data: data.map(item => showNormalized ? item.nasdaqNormalized : item.nasdaqPrice),
+        borderColor: 'rgb(255, 99, 132)',
+        backgroundColor: 'rgba(255, 99, 132, 0.5)',
+        tension: 0.1,
       }
     ],
   };
@@ -65,8 +72,8 @@ export default function StockChart({ data, metadata }) {
       title: {
         display: true,
         text: showNormalized 
-          ? 'Stock Performance (Starting at 100)' 
-          : 'Stock Price History',
+          ? 'Stock Performance vs NASDAQ (Starting at 100)' 
+          : 'Price History Comparison',
       },
       tooltip: {
         callbacks: {

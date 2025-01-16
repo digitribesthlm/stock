@@ -5,35 +5,82 @@ export default async function handler(req, res) {
     
     console.log('Fetching data for ticker:', ticker);
     
-    // Get historical data for the stock
-    console.log('Fetching stock data...');
-    const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=1y&interval=1d`);
+    // Get historical data for both the stock and NASDAQ
+    const [stockResponse, nasdaqResponse] = await Promise.all([
+      fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=1y&interval=1d`),
+      fetch(`https://query1.finance.yahoo.com/v8/finance/chart/%5EIXIC?range=1y&interval=1d`)  // Fixed NASDAQ symbol
+    ]);
     
-    if (!response.ok) {
-      throw new Error(`Stock API request failed with status ${response.status}`);
+    if (!stockResponse.ok) {
+      throw new Error(`Stock API request failed with status ${stockResponse.status}`);
+    }
+    if (!nasdaqResponse.ok) {
+      throw new Error(`NASDAQ API request failed with status ${nasdaqResponse.status}`);
     }
 
-    const data = await response.json();
+    const [stockData, nasdaqData] = await Promise.all([
+      stockResponse.json(),
+      nasdaqResponse.json()
+    ]);
     
-    if (!data.chart?.result?.[0]) {
+    if (!stockData.chart?.result?.[0]) {
       throw new Error(`No historical data available for ${ticker}`);
     }
+    if (!nasdaqData.chart?.result?.[0]) {
+      throw new Error('No historical data available for NASDAQ');
+    }
 
-    const stockData = data.chart.result[0];
-    const timestamps = stockData.timestamp;
-    const quotes = stockData.indicators.quote[0];
-    
+    const stock = stockData.chart.result[0];
+    const nasdaq = nasdaqData.chart.result[0];
+
+    console.log('Got NASDAQ data points:', nasdaq.timestamp.length);
+    console.log('Got Stock data points:', stock.timestamp.length);
+
+    // Get the first valid NASDAQ price for normalization
+    const firstNasdaqPrice = nasdaq.indicators.quote[0].close.find(price => price !== null);
+    console.log('First NASDAQ price:', firstNasdaqPrice);
+
+    // Create a map of dates to NASDAQ values for easy lookup
+    const nasdaqByDate = {};
+    nasdaq.timestamp.forEach((timestamp, index) => {
+      const date = new Date(timestamp * 1000).toISOString().split('T')[0];
+      const price = nasdaq.indicators.quote[0].close[index];
+      if (price !== null) {
+        nasdaqByDate[date] = price;
+      }
+    });
+
+    console.log('NASDAQ dates available:', Object.keys(nasdaqByDate).length);
+
+    // Get the first valid stock price for normalization
+    const firstStockPrice = stock.indicators.quote[0].close.find(price => price !== null);
+    console.log('First stock price:', firstStockPrice);
+
     // Create the chart data with closing prices (keeping chronological order)
-    const chartData = timestamps.map((timestamp, index) => {
+    const chartData = stock.timestamp.map((timestamp, index) => {
       const date = new Date(timestamp * 1000);
-      return {
-        date: date.toISOString(),
-        stockPrice: quotes.close[index],
-        stockNormalized: (quotes.close[index] / quotes.close[0]) * 100
-      };
-    }).filter(item => item.stockPrice !== null);
+      const dateStr = date.toISOString();
+      const dateLookup = dateStr.split('T')[0];
+      const stockPrice = stock.indicators.quote[0].close[index];
+      const nasdaqPrice = nasdaqByDate[dateLookup];
 
-    // Calculate percentage changes for different periods using reversed indices
+      // Only include points where we have both stock and NASDAQ data
+      if (stockPrice !== null && nasdaqPrice !== null && firstStockPrice !== null && firstNasdaqPrice !== null) {
+        return {
+          date: dateStr,
+          stockPrice,
+          nasdaqPrice,
+          stockNormalized: (stockPrice / firstStockPrice) * 100,
+          nasdaqNormalized: (nasdaqPrice / firstNasdaqPrice) * 100
+        };
+      }
+      return null;
+    }).filter(item => item !== null);
+
+    console.log('Final data points:', chartData.length);
+    console.log('Sample data point:', chartData[0]);
+
+    // Calculate percentage changes for different periods
     const calculatePercentageChange = (days) => {
       const lastIndex = chartData.length - 1;
       if (chartData.length < days) {

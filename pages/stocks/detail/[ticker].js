@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '../../../components/DashboardLayout';
 import StockChart from '../../../components/StockChart';
 import StockPeriodChanges from '../../../components/StockPeriodChanges';
+import DisruptionAnalysis from '../../../components/DisruptionAnalysis';
 
 export default function StockDetail() {
   const router = useRouter();
@@ -67,9 +68,14 @@ export default function StockDetail() {
         ) : (
           <>
             <StockPeriodChanges periodChanges={historicalData.metadata.periodChanges} />
-            <div className="bg-white p-4 rounded-lg shadow">
+            <div className="bg-white p-4 rounded-lg shadow mb-6">
               <StockChart data={historicalData.chartData} metadata={historicalData.metadata} />
             </div>
+            <DisruptionAnalysis 
+              ticker={ticker} 
+              companyName={historicalData.metadata.stockSymbol} 
+              sector={historicalData.metadata?.sector} 
+            />
           </>
         )}
 
