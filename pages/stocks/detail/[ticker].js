@@ -1,15 +1,33 @@
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../../../components/DashboardLayout';
+import StockChart from '../../../components/StockChart';
 
 export default function StockDetail() {
   const router = useRouter();
   const { ticker } = router.query;
+  const [historicalData, setHistoricalData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  console.log('Ticker:', ticker); // Debug
+  useEffect(() => {
+    if (ticker) {
+      fetchHistoricalData();
+    }
+  }, [ticker]);
 
-  // If the page is not yet generated, this will be displayed
-  // initially until getInitialProps completes
+  const fetchHistoricalData = async () => {
+    try {
+      const response = await fetch(`/api/historical-price?ticker=${ticker}`);
+      const data = await response.json();
+      setHistoricalData(data);
+      setLoading(false);
+    } catch (err) {
+      setError('Failed to fetch historical data');
+      setLoading(false);
+    }
+  };
+
   if (router.isFallback || !ticker) {
     return (
       <DashboardLayout>
@@ -27,7 +45,18 @@ export default function StockDetail() {
     <DashboardLayout>
       <div className="p-6">
         <h1 className="text-2xl font-bold mb-4">Stock Detail: {ticker}</h1>
-        <p className="text-lg text-gray-700">Hello {ticker}! Welcome to the stock detail page.</p>
+        <p className="text-lg text-gray-700 mb-6">Hello {ticker}! Welcome to the stock detail page.</p>
+        
+        {loading ? (
+          <div className="animate-pulse bg-gray-200 rounded h-[400px]"></div>
+        ) : error ? (
+          <div className="text-red-500">{error}</div>
+        ) : (
+          <div className="bg-white p-4 rounded-lg shadow">
+            <StockChart data={historicalData} />
+          </div>
+        )}
+
         <button 
           onClick={() => router.back()} 
           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
@@ -37,4 +66,4 @@ export default function StockDetail() {
       </div>
     </DashboardLayout>
   );
-} 
+}
