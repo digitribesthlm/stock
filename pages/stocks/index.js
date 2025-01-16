@@ -1,6 +1,8 @@
 import React from 'react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
+import { useRouter } from 'next/router';
+import Link from 'next/link';
 
 // Status options
 const STATUS_OPTIONS = ['Active', 'Potential Buy', 'Bought'];
@@ -251,6 +253,7 @@ export default function StocksPage() {
     key: 'lynchScore',
     direction: 'descending'
   });
+  const router = useRouter();
 
   const itemsPerPage = 9;
   const tableItemsPerPage = 10;
@@ -488,14 +491,16 @@ export default function StocksPage() {
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {paginatedStocks.map((stock) => (
-          <div key={stock._id?.$oid || stock._id} className="bg-white rounded-lg shadow-lg p-6 space-y-4">
-            <div className="flex justify-between items-start">
+          <div key={stock._id?.$oid || stock._id} className="bg-white rounded-lg shadow p-6">
+            <div className="flex justify-between items-start mb-4">
               <div>
-                <h2 className="text-2xl font-bold text-blue-600">{stock.ticker}</h2>
-                <div className="flex items-center space-x-2">
-                  <h3 className="text-sm text-gray-500">{stock.company}</h3>
-                  <span className="text-xs px-2 py-1 bg-gray-100 rounded-full text-gray-600">{stock.companySize}</span>
-                </div>
+                <Link 
+                  href={`/stocks/detail/${stock.ticker}`} 
+                  className="text-xl font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                >
+                  {stock.ticker}
+                </Link>
+                <div className="text-sm text-gray-500">{stock.company}</div>
               </div>
               <div className="flex flex-col items-end">
                 <StatusControls 
@@ -674,7 +679,11 @@ export default function StocksPage() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {paginatedStocks.map((stock) => (
-              <tr key={stock._id?.$oid || stock._id} className="hover:bg-gray-50">
+              <tr 
+                key={stock._id} 
+                onClick={() => router.push(`/stocks/${stock.ticker}`)}
+                className="cursor-pointer hover:bg-gray-50"
+              >
                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{stock.ticker}</td>
                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{stock.company}</td>
                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{stock.companySize}</td>
