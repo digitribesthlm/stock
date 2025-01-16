@@ -681,7 +681,7 @@ export default function StocksPage() {
             {paginatedStocks.map((stock) => (
               <tr 
                 key={stock._id} 
-                onClick={() => router.push(`/stocks/${stock.ticker}`)}
+                onClick={() => router.push(`/stocks/detail/${stock.ticker}`)}
                 className="cursor-pointer hover:bg-gray-50"
               >
                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{stock.ticker}</td>
