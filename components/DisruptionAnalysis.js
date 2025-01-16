@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 
-export default function DisruptionAnalysis({ ticker, companyName, sector }) {
+export default function DisruptionAnalysis({ ticker, companyName, sector, onAnalysisSaved }) {
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [saveStatus, setSaveStatus] = useState(null);
 
   const getLevelColor = (level) => {
     switch (level?.toLowerCase()) {
@@ -30,6 +31,7 @@ export default function DisruptionAnalysis({ ticker, companyName, sector }) {
   const analyzeDisruption = async () => {
     setLoading(true);
     setError(null);
+    setSaveStatus(null);
     try {
       const response = await fetch('/api/analyze-disruption', {
         method: 'POST',
@@ -53,6 +55,33 @@ export default function DisruptionAnalysis({ ticker, companyName, sector }) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveAnalysis = async () => {
+    if (!analysis) return;
+
+    setSaveStatus('saving');
+    try {
+      const response = await fetch('/api/save-disruption-analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(analysis),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save analysis');
+      }
+
+      setSaveStatus('saved');
+      if (onAnalysisSaved) {
+        onAnalysisSaved();
+      }
+    } catch (err) {
+      console.error('Save error:', err);
+      setSaveStatus('error');
     }
   };
 
@@ -97,11 +126,34 @@ export default function DisruptionAnalysis({ ticker, companyName, sector }) {
         </div>
       ) : (
         <div>
-          <div className="mb-6">
-            <h2 className="text-xl font-bold mb-2">Disruption Analysis</h2>
-            <p className="text-gray-600">
-              Analysis for {analysis.company_info.name} ({analysis.company_info.ticker})
-            </p>
+          <div className="mb-6 flex justify-between items-start">
+            <div>
+              <h2 className="text-xl font-bold mb-2">Disruption Analysis</h2>
+              <p className="text-gray-600">
+                Analysis for {analysis.company_info.name} ({analysis.company_info.ticker})
+              </p>
+            </div>
+            <button
+              onClick={saveAnalysis}
+              disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+              className={`px-4 py-2 rounded transition-colors ${
+                saveStatus === 'saved'
+                  ? 'bg-green-600 text-white'
+                  : saveStatus === 'saving'
+                  ? 'bg-gray-400 text-white'
+                  : saveStatus === 'error'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {saveStatus === 'saved'
+                ? '✓ Saved'
+                : saveStatus === 'saving'
+                ? 'Saving...'
+                : saveStatus === 'error'
+                ? 'Save Failed'
+                : 'Save Analysis'}
+            </button>
           </div>
 
           {renderAnalysisSection('Technological Disruption', analysis.disruption_analysis.technological)}
