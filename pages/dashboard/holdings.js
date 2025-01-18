@@ -18,6 +18,13 @@ export default function Holdings() {
     profitMargins: '',
     notes: ''
   });
+  const [availableTickers, setAvailableTickers] = useState([]);
+  const [tickerSearch, setTickerSearch] = useState('');
+
+  // Add this helper function at the top of your file
+  const formatNumber = (value, decimals = 1) => {
+    return value ? Number(value).toFixed(decimals) : '0.0';
+  };
 
   // Add fetch effect to load holdings from MongoDB
   useEffect(() => {
@@ -54,6 +61,46 @@ export default function Holdings() {
 
     fetchHoldings();
   }, []);
+
+  // Add this effect to fetch available tickers
+  useEffect(() => {
+    const fetchTickers = async () => {
+      try {
+        const response = await fetch('/api/stocks');
+        const data = await response.json();
+        console.log('Fetched tickers:', data); // Debug log
+        setAvailableTickers(data);
+      } catch (error) {
+        console.error('Error fetching tickers:', error);
+      }
+    };
+
+    fetchTickers();
+  }, []);
+
+  // Add this function to handle ticker selection
+  const handleTickerChange = async (e) => {
+    const selectedTicker = e.target.value;
+    if (!selectedTicker) return;
+
+    try {
+      const response = await fetch(`/api/stocks/${selectedTicker}`);
+      const stockData = await response.json();
+      
+      setFormData({
+        ...formData,
+        symbol: stockData.ticker,
+        pegRatio: stockData.metrics?.pegRatio || '',
+        insiderOwnership: (stockData.metrics?.insiderHoldings * 100) || '',
+        debtToEquity: stockData.metrics?.debtEquity || '',
+        growthRate: (stockData.metrics?.earningsGrowth * 100) || '',
+        profitMargins: (stockData.metrics?.profitMargins * 100) || '',
+        notes: stockData.analysis?.reasons?.join(', ') || ''
+      });
+    } catch (error) {
+      console.error('Error fetching stock data:', error);
+    }
+  };
 
   // Modify handleSubmit to save to MongoDB
   const handleSubmit = async (e) => {
@@ -132,6 +179,22 @@ export default function Holdings() {
     return holdings.filter(holding => holding.category === category);
   };
 
+  // Modify filter function with debug logs
+  const filteredTickers = availableTickers.filter(stock => {
+    console.log('Filtering stock:', stock); // Debug log
+    console.log('Search term:', tickerSearch); // Debug log
+    return (
+      stock.ticker?.toLowerCase().includes(tickerSearch.toLowerCase()) ||
+      stock.company?.toLowerCase().includes(tickerSearch.toLowerCase())
+    );
+  });
+
+  // Update the input handler with debug log
+  const handleSearchChange = (e) => {
+    console.log('Search changed:', e.target.value); // Debug log
+    setTickerSearch(e.target.value);
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -145,14 +208,32 @@ export default function Holdings() {
               {/* Basic Information */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Symbol</label>
-                <input
-                  type="text"
-                  name="symbol"
-                  value={formData.symbol}
-                  onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                />
+                <div className="mt-1 relative">
+                  <input
+                    type="text"
+                    placeholder="Search ticker or company..."
+                    value={tickerSearch}
+                    onChange={handleSearchChange}
+                    className="mb-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                  <select
+                    name="symbol"
+                    value={formData.symbol}
+                    onChange={(e) => {
+                      handleTickerChange(e);
+                      handleChange(e);
+                    }}
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">Select a ticker</option>
+                    {filteredTickers.map(stock => (
+                      <option key={stock.ticker} value={stock.ticker}>
+                        {stock.ticker} - {stock.company}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Shares</label>
@@ -317,13 +398,13 @@ export default function Holdings() {
                     <td className="px-6 py-4 whitespace-nowrap font-medium">{holding.symbol}</td>
                     <td className="px-6 py-4 whitespace-nowrap">{new Date(holding.purchaseDate).toLocaleDateString()}</td>
                     <td className="px-6 py-4 whitespace-nowrap">{holding.shares}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">${parseFloat(holding.purchasePrice).toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">${parseFloat(holding.purchasePrice || 0).toFixed(2)}</td>
                     <td className="px-6 py-4 whitespace-nowrap">${calculateTotalValue(holding).toFixed(2)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{holding.pegRatio.toFixed(1)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{holding.insiderOwnership.toFixed(1)}%</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{holding.debtToEquity.toFixed(1)}%</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{holding.growthRate.toFixed(1)}%</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{holding.profitMargins.toFixed(1)}%</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{formatNumber(holding.pegRatio)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{formatNumber(holding.insiderOwnership)}%</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{formatNumber(holding.debtToEquity)}%</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{formatNumber(holding.growthRate)}%</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{formatNumber(holding.profitMargins)}%</td>
                     <td className="px-6 py-4 whitespace-nowrap capitalize">{holding.category}</td>
                     <td className="px-6 py-4">{holding.notes}</td>
                   </tr>
