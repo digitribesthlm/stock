@@ -78,14 +78,18 @@ export default function Holdings() {
     fetchTickers();
   }, []);
 
-  // Add this function to handle ticker selection
+  // Modify the handleTickerChange function to include debug logs
   const handleTickerChange = async (e) => {
     const selectedTicker = e.target.value;
+    console.log('Selected ticker:', selectedTicker); // Debug log
+    
     if (!selectedTicker) return;
 
     try {
+      console.log('Fetching data for ticker:', selectedTicker); // Debug log
       const response = await fetch(`/api/stocks/${selectedTicker}`);
       const stockData = await response.json();
+      console.log('Received stock data:', stockData); // Debug log
       
       setFormData({
         ...formData,
@@ -97,6 +101,8 @@ export default function Holdings() {
         profitMargins: (stockData.metrics?.profitMargins * 100) || '',
         notes: stockData.analysis?.reasons?.join(', ') || ''
       });
+      
+      console.log('Updated form data:', formData); // Debug log
     } catch (error) {
       console.error('Error fetching stock data:', error);
     }
