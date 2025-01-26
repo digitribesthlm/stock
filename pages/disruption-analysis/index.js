@@ -70,6 +70,7 @@ export default function DisruptionAnalysis() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
+  const [selectedPeriod, setSelectedPeriod] = useState('30d'); // '30d' or '90d'
 
   useEffect(() => {
     const fetchData = async () => {
@@ -209,7 +210,31 @@ export default function DisruptionAnalysis() {
         
         <div className="grid grid-cols-1 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Disruption Score Distribution & 30-Day Returns</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Disruption Score Distribution & Returns</h2>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setSelectedPeriod('30d')}
+                  className={`px-3 py-1 rounded ${
+                    selectedPeriod === '30d'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  30 Days
+                </button>
+                <button
+                  onClick={() => setSelectedPeriod('90d')}
+                  className={`px-3 py-1 rounded ${
+                    selectedPeriod === '90d'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  90 Days
+                </button>
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {[2, 3, 4, 5].map(score => {
                 const stocksWithScore = analyses.filter(a => 
@@ -218,9 +243,12 @@ export default function DisruptionAnalysis() {
                 const count = stocksWithScore.length;
                 const percentage = (count / analyses.length * 100).toFixed(1);
                 
-                // Calculate average 30-day return for stocks with this score
+                // Calculate average return for selected period
                 const returns = stocksWithScore
-                  .map(a => stockChanges[a.ticker]?.change30d)
+                  .map(a => selectedPeriod === '30d' 
+                    ? stockChanges[a.ticker]?.change30d 
+                    : stockChanges[a.ticker]?.change90d
+                  )
                   .filter(change => change !== null && change !== undefined);
                 const avgReturn = returns.length > 0
                   ? returns.reduce((sum, val) => sum + val, 0) / returns.length
@@ -236,7 +264,7 @@ export default function DisruptionAnalysis() {
                     </div>
                     {avgReturn !== null && (
                       <div className={`text-sm font-medium ${avgReturn >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        Avg 30d: {avgReturn >= 0 ? '↑' : '↓'} {Math.abs(avgReturn).toFixed(2)}%
+                        Avg {selectedPeriod === '30d' ? '30d' : '90d'}: {avgReturn >= 0 ? '↑' : '↓'} {Math.abs(avgReturn).toFixed(2)}%
                       </div>
                     )}
                   </div>
@@ -264,10 +292,10 @@ export default function DisruptionAnalysis() {
                     Overall Score
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    30d Change
+                    {selectedPeriod === '30d' ? '30d Change' : '90d Change'}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    90d Change
+                    {selectedPeriod === '30d' ? '90d Change' : '30d Change'}
                   </th>
                 </tr>
               </thead>
@@ -293,10 +321,10 @@ export default function DisruptionAnalysis() {
                         {formatScore(analysis.overallDisruption?.score)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {formatPercentage(changes.change30d)}
+                        {formatPercentage(selectedPeriod === '30d' ? changes.change30d : changes.change90d)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {formatPercentage(changes.change90d)}
+                        {formatPercentage(selectedPeriod === '30d' ? changes.change90d : changes.change30d)}
                       </td>
                     </tr>
                   );
