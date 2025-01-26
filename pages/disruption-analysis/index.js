@@ -70,7 +70,19 @@ export default function DisruptionAnalysis() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
-  const [selectedPeriod, setSelectedPeriod] = useState('30d'); // '30d' or '90d'
+  const [selectedPeriod, setSelectedPeriod] = useState('30d');
+  const [selectedFilters, setSelectedFilters] = useState([]);
+  const [selectedDate, setSelectedDate] = useState('all');
+
+  // Analysis filters
+  const analysisFilters = [
+    'Good PEG ratio',
+    'Good insider ownership',
+    'Low debt',
+    'Strong growth',
+    'Strong margins',
+    'Low institutional ownership'
+  ];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -183,6 +195,33 @@ export default function DisruptionAnalysis() {
     );
   };
 
+  // Filter analyses by date range
+  const getDateFilteredAnalyses = (analyses) => {
+    if (selectedDate === 'all') return analyses;
+    
+    const now = new Date();
+    const cutoffDate = new Date();
+    
+    switch (selectedDate) {
+      case '7d':
+        cutoffDate.setDate(now.getDate() - 7);
+        break;
+      case '30d':
+        cutoffDate.setDate(now.getDate() - 30);
+        break;
+      case '90d':
+        cutoffDate.setDate(now.getDate() - 90);
+        break;
+      default:
+        return analyses;
+    }
+
+    return analyses.filter(a => {
+      const analysisDate = new Date(a.analysisDate?.$date);
+      return analysisDate >= cutoffDate;
+    });
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -210,41 +249,107 @@ export default function DisruptionAnalysis() {
         
         <div className="grid grid-cols-1 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Disruption Score Distribution & Returns</h2>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => setSelectedPeriod('30d')}
-                  className={`px-3 py-1 rounded ${
-                    selectedPeriod === '30d'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  30 Days
-                </button>
-                <button
-                  onClick={() => setSelectedPeriod('90d')}
-                  className={`px-3 py-1 rounded ${
-                    selectedPeriod === '90d'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  90 Days
-                </button>
+            <div className="flex flex-col space-y-4 mb-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-2 md:space-y-0">
+                <div className="flex items-center space-x-4">
+                  <h2 className="text-lg font-semibold text-gray-900">Disruption Score Distribution & Returns</h2>
+                  <select
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">All Dates</option>
+                    <option value="7d">Last 7 Days</option>
+                    <option value="30d">Last 30 Days</option>
+                    <option value="90d">Last 90 Days</option>
+                  </select>
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setSelectedPeriod('30d')}
+                    className={`px-3 py-1 rounded ${
+                      selectedPeriod === '30d'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    30 Days
+                  </button>
+                  <button
+                    onClick={() => setSelectedPeriod('90d')}
+                    className={`px-3 py-1 rounded ${
+                      selectedPeriod === '90d'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    90 Days
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Analysis:</label>
+                <div className="flex flex-wrap gap-2">
+                  {analysisFilters.map(filter => (
+                    <button
+                      key={filter}
+                      onClick={() => {
+                        setSelectedFilters(prev => 
+                          prev.includes(filter)
+                            ? prev.filter(f => f !== filter)
+                            : [...prev, filter]
+                        );
+                      }}
+                      className={`px-3 py-1 rounded-full text-sm ${
+                        selectedFilters.includes(filter)
+                          ? 'bg-blue-100 text-blue-800 border border-blue-600'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-transparent'
+                      }`}
+                    >
+                      {filter}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
+
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {[2, 3, 4, 5].map(score => {
-                const stocksWithScore = analyses.filter(a => 
-                  Math.floor(a.overallDisruption?.score) === score
-                );
-                const count = stocksWithScore.length;
-                const percentage = (count / analyses.length * 100).toFixed(1);
+                const dateFilteredAnalyses = getDateFilteredAnalyses(analyses);
+                const filteredAnalyses = dateFilteredAnalyses.filter(a => {
+                  if (Math.floor(a.overallDisruption?.score) !== score) return false;
+                  
+                  // Apply analysis filters
+                  if (selectedFilters.length > 0) {
+                    const matchesFilters = selectedFilters.every(filter => {
+                      switch (filter) {
+                        case 'Good PEG ratio':
+                          return a.metrics?.pegRatio < 1;
+                        case 'Good insider ownership':
+                          return a.metrics?.insiderOwnership > 5;
+                        case 'Low debt':
+                          return a.metrics?.debtToEquity < 30;
+                        case 'Strong growth':
+                          return a.metrics?.earningsGrowth > 25;
+                        case 'Strong margins':
+                          return a.metrics?.profitMargins > 20;
+                        case 'Low institutional ownership':
+                          return a.metrics?.institutionalOwnership < 70;
+                        default:
+                          return true;
+                      }
+                    });
+                    if (!matchesFilters) return false;
+                  }
+                  
+                  return true;
+                });
+
+                const count = filteredAnalyses.length;
+                const percentage = (count / dateFilteredAnalyses.length * 100).toFixed(1);
                 
                 // Calculate average return for selected period
-                const returns = stocksWithScore
+                const returns = filteredAnalyses
                   .map(a => selectedPeriod === '30d' 
                     ? stockChanges[a.ticker]?.change30d 
                     : stockChanges[a.ticker]?.change90d
@@ -263,7 +368,7 @@ export default function DisruptionAnalysis() {
                       {count} stocks ({percentage}%)
                     </div>
                     {avgReturn !== null && (
-                      <div className={`text-sm font-medium ${avgReturn >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <div className={`text-sm font-medium ${avgReturn >= 0 ? 'text-green-600' : 'text-red-600'} mb-2`}>
                         Avg {selectedPeriod === '30d' ? '30d' : '90d'}: {avgReturn >= 0 ? '↑' : '↓'} {Math.abs(avgReturn).toFixed(2)}%
                       </div>
                     )}
@@ -286,6 +391,9 @@ export default function DisruptionAnalysis() {
                     Company
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Classifications
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Analysis Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -300,35 +408,70 @@ export default function DisruptionAnalysis() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {analyses.map((analysis) => {
-                  const changes = stockChanges[analysis.ticker] || {};
-                  return (
-                    <tr 
-                      key={analysis._id.$oid || analysis.ticker} 
-                      onClick={() => setSelectedAnalysis(analysis)}
-                      className="hover:bg-gray-50 cursor-pointer"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
-                        {analysis.ticker}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {changes.company || analysis.ticker}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(analysis.analysisDate)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {formatScore(analysis.overallDisruption?.score)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {formatPercentage(selectedPeriod === '30d' ? changes.change30d : changes.change90d)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {formatPercentage(selectedPeriod === '30d' ? changes.change90d : changes.change30d)}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {getDateFilteredAnalyses(analyses)
+                  .filter(a => {
+                    if (selectedFilters.length === 0) return true;
+                    
+                    return selectedFilters.every(filter => {
+                      switch (filter) {
+                        case 'Good PEG ratio':
+                          return a.metrics?.pegRatio < 1;
+                        case 'Good insider ownership':
+                          return a.metrics?.insiderOwnership > 5;
+                        case 'Low debt':
+                          return a.metrics?.debtToEquity < 30;
+                        case 'Strong growth':
+                          return a.metrics?.earningsGrowth > 25;
+                        case 'Strong margins':
+                          return a.metrics?.profitMargins > 20;
+                        case 'Low institutional ownership':
+                          return a.metrics?.institutionalOwnership < 70;
+                        default:
+                          return true;
+                      }
+                    });
+                  })
+                  .map((analysis) => {
+                    const changes = stockChanges[analysis.ticker] || {};
+                    return (
+                      <tr 
+                        key={analysis._id.$oid || analysis.ticker} 
+                        onClick={() => setSelectedAnalysis(analysis)}
+                        className="hover:bg-gray-50 cursor-pointer"
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
+                          {analysis.ticker}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {changes.company || analysis.ticker}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-medium">Industry:</span>
+                              <span>{analysis.industry}</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="font-medium">Sector:</span>
+                              <span>{analysis.sector}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(analysis.analysisDate)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {formatScore(analysis.overallDisruption?.score)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {formatPercentage(selectedPeriod === '30d' ? changes.change30d : changes.change90d)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {formatPercentage(selectedPeriod === '30d' ? changes.change90d : changes.change30d)}
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>

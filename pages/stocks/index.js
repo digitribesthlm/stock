@@ -260,6 +260,7 @@ export default function StocksPage() {
   const [activeFilters, setActiveFilters] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState('all');
+  const [selectedSector, setSelectedSector] = useState('all');
   const [sortConfig, setSortConfig] = useState({
     key: 'lynchScore',
     direction: 'descending'
@@ -284,6 +285,12 @@ export default function StocksPage() {
     const dates = stocks.map(stock => formatMongoDate(stock.metadata?.lastUpdated))
       .filter(date => date !== 'N/A');
     return ['all', ...Array.from(new Set(dates))].sort();
+  }, [stocks]);
+
+  // Get unique sectors from stocks
+  const availableSectors = useMemo(() => {
+    const sectors = stocks.map(stock => stock.sector).filter(Boolean);
+    return ['all', ...Array.from(new Set(sectors))].sort();
   }, [stocks]);
 
   // Handlers
@@ -392,9 +399,11 @@ export default function StocksPage() {
       const matchesDate = selectedDate === 'all' || 
         formatMongoDate(stock.metadata?.lastUpdated) === selectedDate;
 
-      return matchesSearch && matchesFilters && matchesDate;
+      const matchesSector = selectedSector === 'all' || stock.sector === selectedSector;
+
+      return matchesSearch && matchesFilters && matchesDate && matchesSector;
     });
-  }, [stocks, searchQuery, activeFilters, selectedDate]);
+  }, [stocks, searchQuery, activeFilters, selectedDate, selectedSector]);
 
   // Sort stocks
   const sortedStocks = useMemo(() => {
@@ -532,6 +541,16 @@ export default function StocksPage() {
                   {stock.ticker}
                 </Link>
                 <div className="text-sm text-gray-500">{stock.company}</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  <div className="flex items-center space-x-1">
+                    <span className="font-medium">Industry:</span>
+                    <span>{stock.industry || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <span className="font-medium">Sector:</span>
+                    <span>{stock.sector || 'N/A'}</span>
+                  </div>
+                </div>
               </div>
               <div className="flex flex-col items-end">
                 <StatusControls 
@@ -844,6 +863,20 @@ export default function StocksPage() {
         {availableDates.map(date => (
           <option key={date} value={date}>
             {date === 'all' ? 'All Dates' : date}
+          </option>
+        ))}
+      </select>
+      <select
+        className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        value={selectedSector}
+        onChange={(e) => {
+          setSelectedSector(e.target.value);
+          setCurrentPage(1);
+        }}
+      >
+        {availableSectors.map(sector => (
+          <option key={sector} value={sector}>
+            {sector === 'all' ? 'All Sectors' : sector}
           </option>
         ))}
       </select>
