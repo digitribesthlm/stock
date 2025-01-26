@@ -68,10 +68,10 @@ export default function DashboardLayout({ children }) {
                   Holdings
                 </Link>
                 <Link 
-                  href="/dashboard/analytics" 
-                  className={`text-gray-600 hover:text-gray-900 ${router.pathname === '/dashboard/analytics' ? 'text-blue-600 font-medium' : ''}`}
+                  href="/disruption-analysis" 
+                  className={`text-gray-600 hover:text-gray-900 ${router.pathname === '/disruption-analysis' ? 'text-blue-600 font-medium' : ''}`}
                 >
-                  Analytics
+                  Disruption Analysis
                 </Link>
               </div>
             </div>

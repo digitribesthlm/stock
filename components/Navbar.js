@@ -7,6 +7,7 @@ export default function Navbar({ onLoginClick }) {
       <div className="flex items-center space-x-8">
         <Link href="/" className="text-gray-600 hover:text-gray-900">Home</Link>
         <Link href="/stocks" className="text-gray-600 hover:text-gray-900">Stocks</Link>
+        <Link href="/disruption-analysis" className="text-gray-600 hover:text-gray-900">Disruption Analysis</Link>
         <Link href="#" className="text-gray-600 hover:text-gray-900">About</Link>
         <button 
           onClick={onLoginClick}
