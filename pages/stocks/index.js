@@ -29,21 +29,31 @@ const formatMongoDate = (mongoDate) => {
   if (!mongoDate) return 'N/A';
   
   try {
-    // Handle nested MongoDB date format
-    let timestamp;
-    if (mongoDate.$date && mongoDate.$date.$numberLong) {
-      timestamp = mongoDate.$date.$numberLong;
-    } else if (mongoDate.$date) {
-      timestamp = mongoDate.$date;
-    } else {
-      timestamp = mongoDate;
-    }
+    // Handle different MongoDB date formats
+    let date;
     
-    const date = new Date(Number(timestamp));
-    if (isNaN(date.getTime())) return 'N/A';
-    return date.toLocaleDateString();
+    if (typeof mongoDate === 'string') {
+      date = new Date(mongoDate);
+    } else if (mongoDate.$date) {
+      if (typeof mongoDate.$date === 'string') {
+        date = new Date(mongoDate.$date);
+      } else if (mongoDate.$date.$numberLong) {
+        date = new Date(Number(mongoDate.$date.$numberLong));
+      } else {
+        date = new Date(mongoDate.$date);
+      }
+    } else {
+      date = new Date(mongoDate);
+    }
+
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date:', mongoDate);
+      return 'N/A';
+    }
+
+    return date.toISOString().split('T')[0]; // Returns YYYY-MM-DD format
   } catch (error) {
-    console.error('Date parsing error:', error);
+    console.error('Date parsing error:', error, mongoDate);
     return 'N/A';
   }
 };
@@ -249,6 +259,7 @@ export default function StocksPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [activeFilters, setActiveFilters] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDate, setSelectedDate] = useState('all');
   const [sortConfig, setSortConfig] = useState({
     key: 'lynchScore',
     direction: 'descending'
@@ -267,6 +278,13 @@ export default function StocksPage() {
     'Strong margins',
     'Low institutional ownership'
   ];
+
+  // Get unique dates from stocks
+  const availableDates = useMemo(() => {
+    const dates = stocks.map(stock => formatMongoDate(stock.metadata?.lastUpdated))
+      .filter(date => date !== 'N/A');
+    return ['all', ...Array.from(new Set(dates))].sort();
+  }, [stocks]);
 
   // Handlers
   const handleSearch = useCallback((value) => {
@@ -349,21 +367,34 @@ export default function StocksPage() {
   // Filter stocks
   const filteredStocks = useMemo(() => {
     return stocks.filter(stock => {
-      // Apply ticker search filter
-      const matchesSearch = searchQuery === '' || 
-        stock.ticker.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = stock.ticker.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        stock.company?.toLowerCase().includes(searchQuery.toLowerCase());
 
-      // Apply label filters
-      const matchesLabels = activeFilters.length === 0 || 
-        activeFilters.every(filter =>
-          stock.analysis?.reasons?.some(reason => 
-            reason.toLowerCase().includes(filter.toLowerCase())
-          )
-        );
+      const matchesFilters = activeFilters.every(filter => {
+        switch (filter) {
+          case 'Good PEG ratio':
+            return getNumberValue(stock.metrics, 'pegRatio') < 1.5;
+          case 'Good insider ownership':
+            return getNumberValue(stock.metrics, 'insiderHoldings') > 0.1;
+          case 'Low debt':
+            return getNumberValue(stock.metrics, 'debtToEquity') < 1.0;
+          case 'Strong growth':
+            return getNumberValue(stock.metrics, 'earningsGrowth') > 0.15;
+          case 'Strong margins':
+            return getNumberValue(stock.metrics, 'profitMargins') > 0.2;
+          case 'Low institutional ownership':
+            return getNumberValue(stock.metrics, 'institutionalOwnership') < 0.7;
+          default:
+            return true;
+        }
+      });
 
-      return matchesSearch && matchesLabels;
+      const matchesDate = selectedDate === 'all' || 
+        formatMongoDate(stock.metadata?.lastUpdated) === selectedDate;
+
+      return matchesSearch && matchesFilters && matchesDate;
     });
-  }, [stocks, activeFilters, searchQuery]);
+  }, [stocks, searchQuery, activeFilters, selectedDate]);
 
   // Sort stocks
   const sortedStocks = useMemo(() => {
@@ -509,7 +540,7 @@ export default function StocksPage() {
                   onStatusChange={handleStatusChange}
                 />
                 <span className="text-xs text-gray-500 mt-2">
-                  Updated: {formatMongoDate(stock.metadata?.lastUpdated)}
+                  {formatMongoDate(stock.metadata?.lastUpdated)}
                 </span>
               </div>
             </div>
@@ -802,6 +833,20 @@ export default function StocksPage() {
       </div>
       
       <SearchBar searchQuery={searchQuery} handleSearch={handleSearch} />
+      <select
+        className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        value={selectedDate}
+        onChange={(e) => {
+          setSelectedDate(e.target.value);
+          setCurrentPage(1);
+        }}
+      >
+        {availableDates.map(date => (
+          <option key={date} value={date}>
+            {date === 'all' ? 'All Dates' : date}
+          </option>
+        ))}
+      </select>
       <FilterBar 
         filterLabels={filterLabels}
         activeFilters={activeFilters}
