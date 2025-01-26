@@ -66,38 +66,120 @@ function DisruptionModal({ analysis, onClose }) {
 
 export default function DisruptionAnalysis() {
   const [analyses, setAnalyses] = useState([]);
+  const [stockChanges, setStockChanges] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
 
   useEffect(() => {
-    const fetchAnalyses = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/disruption-analyses');
-        if (!response.ok) throw new Error('Failed to fetch analyses');
-        const data = await response.json();
-        setAnalyses(data);
+        
+        // First get all disruption analyses to get the tickers
+        const analysesResponse = await fetch('/api/disruption-analyses');
+        if (!analysesResponse.ok) throw new Error('Failed to fetch analyses');
+        const analysesData = await analysesResponse.json();
+        console.log('Got analyses:', analysesData);
+        setAnalyses(analysesData);
+
+        // Check sessionStorage for cached stock data
+        const cachedData = sessionStorage.getItem('stockChanges');
+        const cachedTimestamp = sessionStorage.getItem('stockChangesTimestamp');
+        const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+        // Use cached data if it's fresh enough
+        if (cachedData && cachedTimestamp && (Date.now() - parseInt(cachedTimestamp)) < CACHE_DURATION) {
+          console.log('Using cached stock changes');
+          setStockChanges(JSON.parse(cachedData));
+          return;
+        }
+
+        // Fetch fresh stock data for each ticker
+        const changes = {};
+        for (const analysis of analysesData) {
+          const ticker = analysis.ticker;
+          if (!changes[ticker]) {
+            console.log('Fetching stock data for:', ticker);
+            try {
+              // Get company info
+              const stockResponse = await fetch(`/api/stocks/${ticker}`);
+              let companyName = ticker;
+              if (stockResponse.ok) {
+                const stockData = await stockResponse.json();
+                companyName = stockData.company || ticker;
+              }
+
+              // Get historical prices
+              const historyResponse = await fetch(`/api/historical-price?ticker=${ticker}`);
+              if (historyResponse.ok) {
+                const historyData = await historyResponse.json();
+                console.log('History data for', ticker, ':', historyData);
+                
+                if (historyData.metadata?.periodChanges) {
+                  changes[ticker] = {
+                    change30d: historyData.metadata.periodChanges['30d']?.change,
+                    change90d: historyData.metadata.periodChanges['90d']?.change,
+                    company: companyName
+                  };
+                  console.log('Calculated changes for', ticker, ':', changes[ticker]);
+                } else {
+                  console.warn('No period changes found for', ticker);
+                }
+              } else {
+                const errorText = await historyResponse.text();
+                console.error('Failed to fetch history for', ticker, ':', historyResponse.status, errorText);
+              }
+            } catch (err) {
+              console.error(`Error fetching data for ${ticker}:`, err);
+            }
+          }
+        }
+
+        // Cache the results
+        console.log('Caching final changes:', changes);
+        sessionStorage.setItem('stockChanges', JSON.stringify(changes));
+        sessionStorage.setItem('stockChangesTimestamp', Date.now().toString());
+        
+        setStockChanges(changes);
       } catch (err) {
+        console.error('Error:', err);
         setError(err.message);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAnalyses();
+    fetchData();
   }, []);
 
   const formatDate = (date) => {
-    return new Date(date).toLocaleDateString();
+    if (!date || !date.$date) return new Date().toLocaleDateString(); // Use today's date if none provided
+    try {
+      return new Date(date.$date).toLocaleDateString();
+    } catch (e) {
+      console.error('Error formatting date:', e);
+      return new Date().toLocaleDateString(); // Fallback to today's date
+    }
   };
 
-  const getScoreColor = (score, maxScore) => {
-    const percentage = (score / maxScore) * 100;
-    if (percentage >= 80) return 'text-green-600';
-    if (percentage >= 60) return 'text-blue-600';
-    if (percentage >= 40) return 'text-yellow-600';
-    return 'text-red-600';
+  const formatScore = (score) => {
+    if (!score && score !== 0) return '-';
+    return (
+      <span className={`font-semibold ${score >= 4 ? 'text-green-600' : score >= 3 ? 'text-blue-600' : 'text-red-600'}`}>
+        {score}/5
+      </span>
+    );
+  };
+
+  const formatPercentage = (value) => {
+    if (value === null || value === undefined) return '-';
+    const formattedValue = Math.abs(value).toFixed(2);
+    return (
+      <span className={`font-semibold ${value > 0 ? 'text-green-600' : 'text-red-600'}`}>
+        {value > 0 ? '↑' : '↓'} {formattedValue}%
+      </span>
+    );
   };
 
   if (loading) {
@@ -125,6 +207,24 @@ export default function DisruptionAnalysis() {
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Disruption Analysis</h1>
         
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Last 30 Days</h2>
+            <div className="text-3xl font-bold text-blue-600 mb-2">
+              {analyses.length}
+            </div>
+            <div className="text-sm text-gray-600">Analyses performed</div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Last 60 Days</h2>
+            <div className="text-3xl font-bold text-blue-600 mb-2">
+              {analyses.length}
+            </div>
+            <div className="text-sm text-gray-600">Analyses performed</div>
+          </div>
+        </div>
+        
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -143,50 +243,43 @@ export default function DisruptionAnalysis() {
                     Overall Score
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Categories
+                    30d Change
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    90d Change
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {analyses.map((analysis) => (
-                  <tr 
-                    key={analysis._id.$oid} 
-                    onClick={() => setSelectedAnalysis(analysis)}
-                    className="hover:bg-gray-50 cursor-pointer"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
-                      {analysis.ticker}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {analysis.company}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(analysis.analysisDate.$date)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className={`font-semibold ${getScoreColor(analysis.overallDisruption.score, analysis.overallDisruption.maxScore)}`}>
-                        {analysis.overallDisruption.score}/{analysis.overallDisruption.maxScore}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="flex gap-1">
-                        {Object.entries(analysis.categories).map(([category, data]) => (
-                          <span
-                            key={category}
-                            className={`inline-block px-2 py-1 rounded-full text-xs ${
-                              data.level === 'High' ? 'bg-green-100 text-green-800' :
-                              data.level === 'Moderate' ? 'bg-yellow-100 text-yellow-800' :
-                              data.level === 'Low' ? 'bg-orange-100 text-orange-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            {data.level[0]}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {analyses.map((analysis) => {
+                  const changes = stockChanges[analysis.ticker] || {};
+                  return (
+                    <tr 
+                      key={analysis._id.$oid || analysis.ticker} 
+                      onClick={() => setSelectedAnalysis(analysis)}
+                      className="hover:bg-gray-50 cursor-pointer"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
+                        {analysis.ticker}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {changes.company || analysis.ticker}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(analysis.analysisDate)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {formatScore(analysis.overallDisruption?.score)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {formatPercentage(changes.change30d)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {formatPercentage(changes.change90d)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
