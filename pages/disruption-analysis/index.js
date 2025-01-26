@@ -207,21 +207,42 @@ export default function DisruptionAnalysis() {
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Disruption Analysis</h1>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Last 30 Days</h2>
-            <div className="text-3xl font-bold text-blue-600 mb-2">
-              {analyses.length}
-            </div>
-            <div className="text-sm text-gray-600">Analyses performed</div>
-          </div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Disruption Score Distribution & 30-Day Returns</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {[2, 3, 4, 5].map(score => {
+                const stocksWithScore = analyses.filter(a => 
+                  Math.floor(a.overallDisruption?.score) === score
+                );
+                const count = stocksWithScore.length;
+                const percentage = (count / analyses.length * 100).toFixed(1);
+                
+                // Calculate average 30-day return for stocks with this score
+                const returns = stocksWithScore
+                  .map(a => stockChanges[a.ticker]?.change30d)
+                  .filter(change => change !== null && change !== undefined);
+                const avgReturn = returns.length > 0
+                  ? returns.reduce((sum, val) => sum + val, 0) / returns.length
+                  : null;
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Last 60 Days</h2>
-            <div className="text-3xl font-bold text-blue-600 mb-2">
-              {analyses.length}
+                return (
+                  <div key={score} className="bg-gray-50 rounded-lg p-4">
+                    <div className="text-lg font-semibold mb-1">
+                      Score {score}
+                    </div>
+                    <div className="text-sm text-gray-600 mb-2">
+                      {count} stocks ({percentage}%)
+                    </div>
+                    {avgReturn !== null && (
+                      <div className={`text-sm font-medium ${avgReturn >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        Avg 30d: {avgReturn >= 0 ? '↑' : '↓'} {Math.abs(avgReturn).toFixed(2)}%
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <div className="text-sm text-gray-600">Analyses performed</div>
           </div>
         </div>
         
