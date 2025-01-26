@@ -16,7 +16,8 @@ export default function Holdings() {
     debtToEquity: '',
     growthRate: '',
     profitMargins: '',
-    notes: ''
+    notes: '',
+    lynchScore: 0
   });
   const [availableTickers, setAvailableTickers] = useState([]);
   const [tickerSearch, setTickerSearch] = useState('');
@@ -78,19 +79,101 @@ export default function Holdings() {
     fetchTickers();
   }, []);
 
-  // Modify the handleTickerChange function to include debug logs
+  // Add this classification function
+  const classifyLynchStyle = (stockData) => {
+    try {
+      const classifications = [];
+      
+      // Extract metrics
+      const marketCap = stockData.metrics?.marketCap || 0;
+      const peRatio = stockData.metrics?.trailingPE || 0;
+      const debtToEquity = stockData.metrics?.debtEquity || 0;
+      const industry = stockData.industry || '';
+      const beta = stockData.metrics?.beta || 0;
+      const dividendYield = stockData.metrics?.dividendYield || 0;
+      const earningsGrowth = (stockData.metrics?.earningsGrowth || 0) * 100;
+      const priceGrowth = stockData.metrics?.priceGrowth || 0;
+
+      // Growth classifications
+      if (marketCap > 200e9) {
+        if (earningsGrowth > 15) {
+          classifications.push({
+            type: "Fast Grower (Despite Size)",
+            details: `Earnings Growth: ${earningsGrowth.toFixed(1)}%`
+          });
+        } else if (earningsGrowth > 8) {
+          classifications.push({
+            type: "Stalwart",
+            details: `Steady Earnings Growth: ${earningsGrowth.toFixed(1)}%`
+          });
+        } else if (dividendYield > 0.005) {
+          classifications.push({
+            type: "Slow Grower",
+            details: `Dividend Yield: ${(dividendYield * 100).toFixed(1)}%`
+          });
+        }
+      } else {
+        if (priceGrowth > 20 || earningsGrowth > 20) {
+          classifications.push({
+            type: "Fast Grower",
+            details: `Growth Rate: ${Math.max(priceGrowth, earningsGrowth).toFixed(1)}%`
+          });
+        } else if (marketCap > 100e9 && dividendYield > 0.005 && earningsGrowth < 8) {
+          classifications.push({
+            type: "Slow Grower",
+            details: `Dividend Yield: ${(dividendYield * 100).toFixed(1)}%`
+          });
+        }
+      }
+
+      // Cyclical check
+      const cyclicalIndustries = ['Auto', 'Airlines', 'Steel', 'Chemical', 'Mining', 'Technology', 'Software'];
+      if (cyclicalIndustries.some(ind => industry.includes(ind)) || beta > 1.2) {
+        classifications.push({
+          type: "Cyclical",
+          details: `Beta: ${beta.toFixed(2)}, Industry: ${industry}`
+        });
+      }
+
+      // Turnaround check
+      if (debtToEquity > 100 || earningsGrowth < -10) {
+        classifications.push({
+          type: "Potential Turnaround",
+          details: `Debt/Equity: ${debtToEquity.toFixed(1)}%`
+        });
+      }
+
+      // Asset Play check
+      if (peRatio && peRatio < 15) {
+        classifications.push({
+          type: "Potential Asset Play",
+          details: `P/E Ratio: ${peRatio.toFixed(1)}`
+        });
+      }
+
+      return classifications;
+    } catch (error) {
+      console.error("Error in classifyLynchStyle:", error);
+      return [];
+    }
+  };
+
+  // Update the handleTickerChange function to use the new classification
   const handleTickerChange = async (e) => {
     const selectedTicker = e.target.value;
-    console.log('Selected ticker:', selectedTicker); // Debug log
+    console.log('Selected ticker:', selectedTicker);
     
     if (!selectedTicker) return;
 
     try {
-      console.log('Fetching data for ticker:', selectedTicker); // Debug log
       const response = await fetch(`/api/stocks/${selectedTicker}`);
       const stockData = await response.json();
-      console.log('Received stock data:', stockData); // Debug log
+      console.log('Received stock data:', stockData);
       
+      // Get Lynch classifications
+      const classifications = classifyLynchStyle(stockData);
+      console.log('Lynch Classifications:', classifications);
+
       setFormData({
         ...formData,
         symbol: stockData.ticker,
@@ -99,13 +182,108 @@ export default function Holdings() {
         debtToEquity: stockData.metrics?.debtEquity || '',
         growthRate: (stockData.metrics?.earningsGrowth * 100) || '',
         profitMargins: (stockData.metrics?.profitMargins * 100) || '',
-        notes: stockData.analysis?.reasons?.join(', ') || ''
+        notes: classifications.map(c => `${c.type}: ${c.details}`).join('\n'),
+        classifications: classifications
       });
       
-      console.log('Updated form data:', formData); // Debug log
+      console.log('Updated form data with classifications:', formData);
     } catch (error) {
       console.error('Error fetching stock data:', error);
     }
+  };
+
+  // Add comprehensive score calculation
+  const getLatestMetrics = (ratiosData) => {
+    if (!ratiosData || ratiosData.length === 0) {
+      console.warn('No ratios data available');
+      return null;
+    }
+
+    // Sort by date descending
+    const sortedRatios = ratiosData.sort((a, b) => 
+      new Date(b.date) - new Date(a.date)
+    );
+
+    const latestData = sortedRatios[0];
+    const dataAge = Math.floor((new Date() - new Date(latestData.date)) / (1000 * 60 * 60 * 24));
+
+    console.log(`Latest data is ${dataAge} days old, from ${latestData.date}`);
+
+    // Alert if data is older than 90 days
+    if (dataAge > 90) {
+      console.warn(`Warning: Using data from ${latestData.date} which is ${dataAge} days old`);
+    }
+
+    return latestData;
+  };
+
+  const calculateScores = (metrics, ratiosData) => {
+    const latestRatios = getLatestMetrics(ratiosData);
+    
+    if (!latestRatios) {
+      console.error('Cannot calculate scores: No recent data available');
+      return { 
+        lynchScore: 0, 
+        grahamScore: 0, 
+        warning: 'No recent financial data available'
+      };
+    }
+
+    // Add data freshness warning to the form
+    const dataWarning = `Using financial data from ${latestRatios.date}. Data may be outdated.`;
+
+    // Use the latest values
+    const values = {
+      trailingPE: metrics.trailingPE,
+      currentRatio: latestRatios.currentRatio,
+      priceToBook: latestRatios.priceToBookRatio,
+      debtToEquity: latestRatios.debtEquityRatio * 100, // Convert to percentage
+      pegRatio: latestRatios.priceEarningsToGrowthRatio,
+      quarterlyRevenueGrowth: metrics.quarterlyRevenueGrowth * 100,
+      quarterlyEarningsGrowth: metrics.quarterlyEarningsGrowth * 100
+    };
+
+    console.log('Using latest values:', values);
+
+    let lynchScore = 0;
+    let grahamScore = 0;
+
+    // Lynch Score calculation
+    if (values.pegRatio > 0 && values.pegRatio < 1) {
+      lynchScore += 3;
+      console.log('Added 3 points for excellent PEG ratio < 1');
+    }
+
+    if (values.debtToEquity < 30) {
+      lynchScore += 3;
+      console.log('Added 3 points for excellent debt/equity ratio');
+    }
+
+    if (values.quarterlyEarningsGrowth > 50) {
+      lynchScore += 3;
+      console.log('Added 3 points for excellent earnings growth');
+    }
+
+    // Graham Score calculation
+    if (values.trailingPE < 15) grahamScore += 1.5;
+    if (values.currentRatio > 1.5) grahamScore += 1.5;
+    if (values.priceToBook < 1.5) grahamScore += 1.5;
+    if (values.debtToEquity < 40) grahamScore += 1.5;
+
+    console.log('Final Scores:', { 
+      lynchScore, 
+      grahamScore,
+      warning: dataWarning,
+      dataDate: latestRatios.date,
+      metrics: values
+    });
+    
+    return { 
+      lynchScore, 
+      grahamScore,
+      warning: dataWarning,
+      dataDate: latestRatios.date
+    };
   };
 
   // Modify handleSubmit to save to MongoDB
@@ -160,7 +338,8 @@ export default function Holdings() {
         debtToEquity: '',
         growthRate: '',
         profitMargins: '',
-        notes: ''
+        notes: '',
+        lynchScore: 0
       });
     } catch (error) {
       setError('Failed to save holding');
@@ -367,6 +546,27 @@ export default function Holdings() {
                   placeholder="Additional analysis notes..."
                 />
               </div>
+
+              {/* Lynch Classifications */}
+              <div className="md:col-span-3">
+                <label className="block text-sm font-medium text-gray-700">Lynch Classifications</label>
+                <div className="mt-1 space-y-2">
+                  {formData.classifications?.map((classification, index) => (
+                    <div key={index} className="bg-blue-50 p-3 rounded-md">
+                      <p className="font-medium text-blue-900">{classification.type}</p>
+                      <p className="text-sm text-blue-700">{classification.details}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 p-4 bg-yellow-50 rounded-md">
+              <p className="text-yellow-700 text-sm">
+                {formData.warning}
+              </p>
+              <p className="text-yellow-600 text-xs mt-1">
+                Last updated: {formData.dataDate}
+              </p>
             </div>
             <button
               type="submit"
